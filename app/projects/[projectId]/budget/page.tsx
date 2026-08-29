@@ -98,6 +98,12 @@ export default async function BudgetPage({ params }: { params: Promise<{ project
     forecastFinal: sortedGroups.reduce((s, g) => s + sum(g, "actual") + sum(g, "forecastRemaining"), 0),
   };
 
+  // "Esto solo se debe poder hacer desde Control Presupuestal" — capturar
+  // o corregir el presupuesto base ya no vive en Budget Line Detail, vive
+  // aquí, en una sola tabla (/budget/setup). El botón cambia de texto
+  // según si ya se dio de alta algo (cualquier hoja con original > 0).
+  const budgetIsSet = leafRows.some((r) => r.original > 0);
+
   return (
     <>
       <AppHeader crumb={<Link href="/" className="hover:text-blueprint">Mis Proyectos</Link>} />
@@ -109,9 +115,17 @@ export default async function BudgetPage({ params }: { params: Promise<{ project
             <h1 className="mt-1 font-display text-2xl font-semibold text-ink">{project?.name ?? "Proyecto"}</h1>
           </div>
           {sortedGroups.length > 0 && (
-            <div className="text-right">
-              <div className="text-xs text-ink-soft">Forecast Final</div>
-              <div className="text-xl font-semibold tabular-nums text-ink">{formatMoney(grand.forecastFinal)}</div>
+            <div className="flex items-center gap-6">
+              <Link
+                href={`/projects/${projectId}/budget/setup`}
+                className="rounded-lg bg-blueprint px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              >
+                {budgetIsSet ? "Modificar presupuesto base" : "Dar de alta presupuesto"}
+              </Link>
+              <div className="text-right">
+                <div className="text-xs text-ink-soft">Forecast Final</div>
+                <div className="text-xl font-semibold tabular-nums text-ink">{formatMoney(grand.forecastFinal)}</div>
+              </div>
             </div>
           )}
         </div>

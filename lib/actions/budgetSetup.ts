@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
@@ -117,57 +118,44 @@ export async function addCostCode(formData: FormData) {
   revalidatePath("/", "layout");
 }
 
-const setInitialBudgetSchema = z.object({
-  budgetLineId: z.string().uuid(),
-  originalAmount: z.coerce.number().min(0),
-});
+// "Esto solo se debe poder hacer desde la página de Control
+// Presupuestal y no las de las partidas individuales" — saveBudgetBaseline
+// is the one place the whole project's presupuesto base gets captured
+// or corrected, from the bulk table at
+// /projects/[projectId]/budget/setup. Field names are dynamic
+// (`amount_<budgetLineId>`, one per leaf) so they're read directly off
+// formData instead of a static zod object.
+//
+// "reason" is only present (and required by the form) once at least
+// one leaf already has a non-zero original — that's the "esto ya no es
+// dar de alta, es modificar" case the UI warns about. There's no
+// audit_log table wired into Drizzle yet, so — same disclosed
+// limitation as the rest of this slice — the reason isn't persisted
+// anywhere; it's a confirmation step, not an audit trail.
+const amountFieldSchema = z.coerce.number().min(0);
 
-// Distinta de correctOriginalAmount de abajo: esto es capturar el
-// presupuesto por PRIMERA vez, no corregir un error después del hecho.
-// Aplicar el catálogo por default (o "personalizar") deja cada partida
-// en $0 — llenar ese número no es una excepción ni necesita motivo ni
-// warning, porque todavía no hay nada comprometido ni pagado contra
-// esta partida. La página solo ofrece esta acción mientras
-// Committed=0 y Actual=0; en cuanto hay actividad real, pasa a requerir
-// el flujo con warning de correctOriginalAmount.
-export async function setInitialBudget(formData: FormData) {
-  const parsed = setInitialBudgetSchema.parse({
-    budgetLineId: formData.get("budgetLineId"),
-    originalAmount: formData.get("originalAmount"),
-  });
+export async function saveBudgetBaseline(formData: FormData) {
+  const projectId = z.string().uuid().parse(formData.get("projectId"));
+  const phase = await getPhaseForProject(projectId);
 
-  await db
-    .update(budgetLines)
-    .set({ originalAmount: String(parsed.originalAmount), updatedAt: new Date() })
-    .where(eq(budgetLines.id, parsed.budgetLineId));
+  const leafLines = await db
+    .select({ id: budgetLines.id })
+    .from(budgetLines)
+    .where(eq(budgetLines.phaseId, phase.id));
+  const validIds = new Set(leafLines.map((l) => l.id));
 
-  revalidatePath("/", "layout");
-}
+  for (const [key, value] of formData.entries()) {
+    if (!key.startsWith("amount_")) continue;
+    const budgetLineId = key.slice("amount_".length);
+    if (!validIds.has(budgetLineId)) continue;
 
-const correctOriginalAmountSchema = z.object({
-  budgetLineId: z.string().uuid(),
-  originalAmount: z.coerce.number().min(0),
-  reason: z.string().min(1),
-});
-
-// El presupuesto original NO se debe mover en el curso normal del
-// proyecto — para eso están las Aditivas y Rebalanceos (ver
-// lib/actions/budgetChanges.ts), que sí quedan en el historial y pasan
-// por aprobación. Esta acción es sólo la excepción: corregir un error
-// de captura del original (p.ej. se tecleó mal al dar de alta el
-// presupuesto). Por eso exige un motivo — la advertencia de que esto
-// no es el camino normal vive en la UI, justo antes de este botón.
-export async function correctOriginalAmount(formData: FormData) {
-  const parsed = correctOriginalAmountSchema.parse({
-    budgetLineId: formData.get("budgetLineId"),
-    originalAmount: formData.get("originalAmount"),
-    reason: formData.get("reason"),
-  });
-
-  await db
-    .update(budgetLines)
-    .set({ originalAmount: String(parsed.originalAmount), updatedAt: new Date() })
-    .where(eq(budgetLines.id, parsed.budgetLineId));
+    const amount = amountFieldSchema.parse(value);
+    await db
+      .update(budgetLines)
+      .set({ originalAmount: String(amount), updatedAt: new Date() })
+      .where(eq(budgetLines.id, budgetLineId));
+  }
 
   revalidatePath("/", "layout");
+  redirect(`/projects/${projectId}/budget`);
 }
