@@ -39,30 +39,30 @@ export default async function BudgetPage({ params }: { params: Promise<{ project
   return (
     <>
       <AppHeader crumb={<Link href="/" className="hover:text-blueprint">Mis Proyectos</Link>} />
-      <main className="mx-auto max-w-4xl px-6 py-10">
-        <div className="flex items-baseline justify-between">
+      <main className="mx-auto max-w-4xl px-6 py-12">
+        <div className="flex items-end justify-between">
           <div>
-            <div className="font-mono text-xs uppercase tracking-wide text-ink-faint">Budget</div>
+            <div className="text-sm text-ink-soft">Budget</div>
             <h1 className="mt-1 font-display text-2xl font-semibold text-ink">{project?.name ?? "Proyecto"}</h1>
           </div>
           <div className="text-right">
-            <div className="font-mono text-[10px] uppercase tracking-wide text-ink-faint">Forecast Final</div>
-            <div className="font-mono text-lg font-semibold text-ink">{formatMoney(totalForecast)}</div>
+            <div className="text-xs text-ink-soft">Forecast Final</div>
+            <div className="text-xl font-semibold tabular-nums text-ink">{formatMoney(totalForecast)}</div>
           </div>
         </div>
 
-        <div className="mt-6 overflow-x-auto rounded-md border border-line-strong bg-surface shadow-sm">
+        <div className="mt-6 overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
           <table className="w-full min-w-[720px] text-sm">
-            <thead className="border-b border-line-strong bg-surface-2 font-mono text-[10px] uppercase tracking-wide text-ink-faint">
+            <thead className="border-b border-line bg-surface-2 text-xs font-medium text-ink-soft">
               <tr>
-                <th className="px-4 py-2.5 text-left">Code</th>
-                <th className="px-4 py-2.5 text-left">Description</th>
-                <th className="px-4 py-2.5 text-right">Original</th>
-                <th className="px-4 py-2.5 text-right">Current</th>
-                <th className="px-4 py-2.5 text-right">Committed</th>
-                <th className="px-4 py-2.5 text-right">Actual</th>
-                <th className="px-4 py-2.5 text-right">Forecast Final</th>
-                <th className="px-4 py-2.5 text-right">Variance</th>
+                <th className="px-4 py-3 text-left">Code</th>
+                <th className="px-4 py-3 text-left">Description</th>
+                <th className="px-4 py-3 text-right">Original</th>
+                <th className="px-4 py-3 text-right">Current</th>
+                <th className="px-4 py-3 text-right">Committed</th>
+                <th className="px-4 py-3 text-right">Actual</th>
+                <th className="px-4 py-3 text-right">Forecast Final</th>
+                <th className="px-4 py-3 text-right">Variance</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -72,24 +72,24 @@ export default async function BudgetPage({ params }: { params: Promise<{ project
                 const variance = current - forecastFinal;
                 return (
                   <tr key={r.budgetLineId} className="transition-colors hover:bg-paper">
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       <Link
                         href={`/budget-lines/${r.budgetLineId}`}
-                        className="font-mono font-medium text-blueprint hover:underline"
+                        className="inline-block rounded-full bg-blueprint-soft px-2.5 py-1 text-xs font-semibold text-blueprint hover:opacity-80"
                       >
                         {r.code}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-ink">{r.description}</td>
-                    <td className="px-4 py-3 text-right font-mono tabular-nums text-ink-soft">{formatMoney(r.original)}</td>
-                    <td className="px-4 py-3 text-right font-mono tabular-nums text-ink">{formatMoney(r.current)}</td>
-                    <td className="px-4 py-3 text-right font-mono tabular-nums text-ink-soft">{formatMoney(r.committed)}</td>
-                    <td className="px-4 py-3 text-right font-mono tabular-nums text-ink">{formatMoney(r.actual)}</td>
-                    <td className="px-4 py-3 text-right font-mono font-medium tabular-nums text-ink">
+                    <td className="px-4 py-3.5 text-ink">{r.description}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-ink-soft">{formatMoney(r.original)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-ink">{formatMoney(r.current)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-ink-soft">{formatMoney(r.committed)}</td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-ink">{formatMoney(r.actual)}</td>
+                    <td className="px-4 py-3.5 text-right font-medium tabular-nums text-ink">
                       {formatMoney(forecastFinal)}
                     </td>
                     <td
-                      className={`px-4 py-3 text-right font-mono tabular-nums ${
+                      className={`px-4 py-3.5 text-right tabular-nums ${
                         variance < 0 ? "font-medium text-redline" : "text-ink-faint"
                       }`}
                     >
@@ -100,13 +100,13 @@ export default async function BudgetPage({ params }: { params: Promise<{ project
               })}
             </tbody>
             <tfoot>
-              <tr className="border-t border-line-strong bg-surface-2 font-medium">
-                <td className="px-4 py-2.5" colSpan={3}>
+              <tr className="border-t border-line-strong bg-surface-2 font-medium text-ink">
+                <td className="px-4 py-3" colSpan={3}>
                   Total
                 </td>
-                <td className="px-4 py-2.5 text-right font-mono tabular-nums">{formatMoney(totalCurrent)}</td>
+                <td className="px-4 py-3 text-right tabular-nums">{formatMoney(totalCurrent)}</td>
                 <td colSpan={2}></td>
-                <td className="px-4 py-2.5 text-right font-mono tabular-nums">{formatMoney(totalForecast)}</td>
+                <td className="px-4 py-3 text-right tabular-nums">{formatMoney(totalForecast)}</td>
                 <td></td>
               </tr>
             </tfoot>
