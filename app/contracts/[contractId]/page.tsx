@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import {
@@ -8,16 +9,13 @@ import {
   changeOrders,
   approvalRequests,
   budgetLines,
-  costCodes,
   phases,
-  projects,
 } from "@/lib/db/schema";
 import { formatMoney } from "@/lib/format";
 import { createInvoice, markInvoicePaid } from "@/lib/actions/invoices";
 import { createChangeOrder, decideChangeOrder } from "@/lib/actions/changeOrders";
 import { AppHeader } from "@/components/AppHeader";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Breadcrumb } from "@/components/Breadcrumb";
 
 // Wireframe G — Detalle con tabs (aquí, solo el tab Financial + Invoices,
 // que es lo que este slice necesita probar de punta a punta).
@@ -40,17 +38,12 @@ export default async function ContractDetailPage({
       current: contractRollup.currentAmount,
       paid: contractRollup.paidAmount,
       pending: contractRollup.pendingInvoices,
-      budgetLineId: budgetLines.id,
-      budgetLineCode: costCodes.code,
       projectId: phases.projectId,
-      projectName: projects.name,
     })
     .from(contracts)
     .innerJoin(counterparties, eq(counterparties.id, contracts.counterpartyId))
     .innerJoin(budgetLines, eq(budgetLines.id, contracts.budgetLineId))
-    .innerJoin(costCodes, eq(costCodes.id, budgetLines.costCodeId))
     .innerJoin(phases, eq(phases.id, budgetLines.phaseId))
-    .innerJoin(projects, eq(projects.id, phases.projectId))
     .leftJoin(contractRollup, eq(contractRollup.contractId, contracts.id))
     .where(eq(contracts.id, contractId));
 
@@ -83,20 +76,16 @@ export default async function ContractDetailPage({
 
   return (
     <>
-      <AppHeader
-        crumb={
-          <Breadcrumb
-            items={[
-              { label: "Mis Proyectos", href: "/" },
-              { label: contract.projectName, href: `/projects/${contract.projectId}` },
-              { label: "Control Presupuestal", href: `/projects/${contract.projectId}/budget` },
-              { label: contract.budgetLineCode, href: `/budget-lines/${contract.budgetLineId}` },
-            ]}
-          />
-        }
-      />
+      <AppHeader crumb={<Link href="/" className="hover:text-blueprint">Mis Proyectos</Link>} />
       <main className="mx-auto max-w-3xl px-6 py-12">
-        <div className="flex items-start justify-between gap-4">
+        <Link
+          href={`/projects/${contract.projectId}/budget`}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-blueprint hover:underline"
+        >
+          &larr; Volver a Control Presupuestal
+        </Link>
+
+        <div className="mt-4 flex items-start justify-between gap-4">
           <div>
             <div className="text-sm text-ink-soft">Contract</div>
             <h1 className="mt-1 font-display text-2xl font-semibold text-ink">{contract.counterpartyName}</h1>
