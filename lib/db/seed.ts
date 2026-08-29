@@ -1,6 +1,7 @@
-// Seeds one dev org/user/portfolio/project/phase/cost-codes/budget-lines/
-// counterparty/contract — the same example numbers used throughout
-// docs/strategy (Land $100M, Soft Costs $50M+5, Hard Costs $300M+10).
+// Seeds one dev org/user/portfolio/project/phase using the real default
+// cost code catalog (with sub-partidas under Soft Costs/Hard Costs) —
+// the same catalog "Usar catálogo estándar" applies from the UI — plus
+// one contract, so there's something to click into right away.
 //
 // Run with: npm run db:seed
 import { db } from "./client";
@@ -15,6 +16,26 @@ import {
   counterparties,
   contracts,
 } from "./schema";
+import { RESIDENTIAL_FOR_SALE_CATALOG, isLeaf } from "../costCodes/defaultCatalog";
+
+// Leaf amounts chosen so Soft Costs sums to 50M and Hard Costs to 300M —
+// the same totals the original single-line demo used — just spread
+// realistically across sub-partidas instead of one lump sum each.
+const LEAF_AMOUNTS: Record<string, string> = {
+  "01": "100000000",
+  "02.01": "15000000",
+  "02.02": "10000000",
+  "02.03": "15000000",
+  "02.04": "10000000",
+  "03.01": "40000000",
+  "03.02": "120000000",
+  "03.03": "70000000",
+  "03.04": "50000000",
+  "03.05": "20000000",
+  "04": "15000000",
+  "05": "20000000",
+  "06": "15000000",
+};
 
 async function main() {
   console.log("Seeding dev data…");
@@ -63,31 +84,36 @@ async function main() {
     })
     .returning();
 
-  const costCodeSeed = [
-    { code: "01", description: "Land", original: "100000000", method: "manual" as const },
-    { code: "02", description: "Soft Costs", original: "50000000", method: "milestone" as const },
-    { code: "03", description: "Hard Costs", original: "300000000", method: "s_curve" as const },
-  ];
+  const idByCode = new Map<string, string>();
+  const budgetLineIdByCode = new Map<string, string>();
 
-  const budgetLineByCode: Record<string, string> = {};
+  for (const entry of RESIDENTIAL_FOR_SALE_CATALOG) {
+    const parentId = entry.parentCode ? idByCode.get(entry.parentCode) ?? null : null;
 
-  for (const row of costCodeSeed) {
     const [cc] = await db
       .insert(costCodes)
-      .values({ organizationId: org.id, code: row.code, description: row.description })
-      .returning();
-
-    const [bl] = await db
-      .insert(budgetLines)
       .values({
-        phaseId: phase.id,
-        costCodeId: cc.id,
-        originalAmount: row.original,
-        forecastMethod: row.method,
+        organizationId: org.id,
+        code: entry.code,
+        description: entry.description,
+        parentCostCodeId: parentId,
       })
       .returning();
+    idByCode.set(entry.code, cc.id);
 
-    budgetLineByCode[row.code] = bl.id;
+    if (isLeaf(RESIDENTIAL_FOR_SALE_CATALOG, entry.code)) {
+      const method = entry.code.startsWith("03") ? ("s_curve" as const) : ("straight_line" as const);
+      const [bl] = await db
+        .insert(budgetLines)
+        .values({
+          phaseId: phase.id,
+          costCodeId: cc.id,
+          originalAmount: LEAF_AMOUNTS[entry.code] ?? "0",
+          forecastMethod: method,
+        })
+        .returning();
+      budgetLineIdByCode.set(entry.code, bl.id);
+    }
   }
 
   const [contractor] = await db
@@ -102,11 +128,11 @@ async function main() {
   const [contract] = await db
     .insert(contracts)
     .values({
-      budgetLineId: budgetLineByCode["03"],
+      budgetLineId: budgetLineIdByCode.get("03.02")!, // Estructura
       counterpartyId: contractor.id,
-      scope: "Obra gris — Hard Costs",
-      originalAmount: "240000000",
-      netAmount: "240000000",
+      scope: "Obra gris — Estructura",
+      originalAmount: "95000000",
+      netAmount: "95000000",
       status: "active",
       signedDate: "2026-01-15",
     })
