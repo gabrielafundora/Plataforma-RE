@@ -8,12 +8,13 @@ export function ProjectNav({
   active,
 }: {
   projectId: string;
-  active: "overview" | "budget" | "contracts";
+  active: "overview" | "budget" | "contracts" | "settings";
 }) {
   const tabs = [
     { key: "overview", label: "Overview", href: `/projects/${projectId}` },
     { key: "budget", label: "Control Presupuestal", href: `/projects/${projectId}/budget` },
     { key: "contracts", label: "Contratos", href: `/projects/${projectId}/contracts` },
+    { key: "settings", label: "Configuración", href: `/projects/${projectId}/settings` },
   ] as const;
 
   return (

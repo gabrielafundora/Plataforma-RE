@@ -83,6 +83,46 @@ export async function createProject(formData: FormData) {
   redirect(`/projects/${project.id}/budget`);
 }
 
+// Configuración de proyecto — "detalles del proyecto", los mismos
+// campos que ya se capturan en createProject arriba, ahora editables
+// después de creado. Edición de metadata simple, sin advertencia ni
+// motivo: a diferencia del presupuesto, esto no mueve dinero
+// comprometido, así que no carga el mismo peso que
+// correctOriginalAmount/deleteProject.
+const updateProjectDetailsSchema = z.object({
+  projectId: z.string().uuid(),
+  name: z.string().min(1),
+  strategy: z.enum(["development", "acquisition"]),
+  currency: z.enum(["USD", "MXN"]),
+  market: z.enum(["US", "MX"]),
+  location: z.string().optional(),
+});
+
+export async function updateProjectDetails(formData: FormData) {
+  const parsed = updateProjectDetailsSchema.parse({
+    projectId: formData.get("projectId"),
+    name: formData.get("name"),
+    strategy: formData.get("strategy"),
+    currency: formData.get("currency"),
+    market: formData.get("market"),
+    location: formData.get("location") || undefined,
+  });
+
+  await db
+    .update(projects)
+    .set({
+      name: parsed.name,
+      strategy: parsed.strategy,
+      currency: parsed.currency,
+      market: parsed.market,
+      location: parsed.location,
+      updatedAt: new Date(),
+    })
+    .where(eq(projects.id, parsed.projectId));
+
+  revalidatePath("/", "layout");
+}
+
 // "Debe haber una forma de borrar un proyecto." Irreversible sobre
 // datos financieros reales, así que exige escribir el nombre exacto
 // del proyecto (comparado contra el nombre real en la base, nunca
