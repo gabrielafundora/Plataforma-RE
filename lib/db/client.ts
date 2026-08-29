@@ -14,9 +14,20 @@ if (!connectionString) {
   );
 }
 
+// Hosted Postgres (Neon, Supabase, RDS, etc.) requires TLS and usually
+// presents a cert our local CA store doesn't know — a bare `new Pool()`
+// against one of those fails the connection outright, which surfaces
+// here as an opaque "Failed query" with no useful cause underneath.
+// A plain local Postgres (localhost/127.0.0.1) doesn't speak TLS at
+// all, so we only turn this on for everything else.
+const isLocal = /localhost|127\.0\.0\.1/.test(connectionString);
+
 // A single pool for the whole process — fine for the local-dev vertical
 // slice. Revisit connection management when this moves to a serverless
 // host (Vercel + hosted Postgres) in a later slice.
-const pool = new Pool({ connectionString });
+const pool = new Pool({
+  connectionString,
+  ssl: isLocal ? undefined : { rejectUnauthorized: false },
+});
 
 export const db = drizzle(pool, { schema });
