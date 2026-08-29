@@ -22,10 +22,13 @@
 
 **La corrección propuesta en este documento no es "hacer menos"**, es **separar rigurosamente "lo que el data model debe poder soportar sin refactor mayor" de "lo que se construye y expone al usuario en V1"** (sección 5). El MVP disciplinado que se propone en la sección 6 es más angosto que el "MVP 1" del Blueprint: un solo asset class (Residential for Sale), un solo phase por proyecto, Equity First hardcodeado, roles fijos, y actuals capturados manualmente — pero con un data model que ya deja los "ganchos" (foreign keys, campos de tipo, tablas de asociación) para no tener que re-arquitecturar cuando lleguen Multifamily o el segundo asset class.
 
-También se identifican **tres huecos reales** que ninguno de los dos documentos resuelve y que si no se deciden ahora, van a doler después:
-- No existe una etapa de **Deal/Underwriting ligero** antes de comprometerse a levantar un Project completo (el Planteamiento la menciona como etapa 1 del ciclo de vida; el Blueprint la elimina silenciosamente).
-- No está definido **de dónde salen los "Actuals"** si no hay integración contable en el MVP — el Monthly Close asume que existen, pero no hay flujo de captura.
-- **Scenario** (Base/Downside/Upside) y **Snapshot** (Baseline/Current/Actual) se presentan como dos mecanismos casi paralelos sin que quede claro cómo se relacionan en el modelo de datos — esto hay que resolverlo antes de tocar una sola tabla.
+También se identificaron **tres huecos reales** que ninguno de los dos documentos resolvía. Las tres ya fueron decididas por la fundadora y quedan incorporadas en este documento (ver 1.2, 3.3 y 4.6):
+
+| Hueco | Decisión de la fundadora | Dónde queda modelado |
+|---|---|---|
+| **Deal/Underwriting ligero** | Sí, se requiere un modo de UW ligero antes de que un Deal se apruebe como Project. | 1.2·2 · 3.3 · 5 |
+| **Fuente de los "Actuals"** | Cash basis: un costo se vuelve Actual cuando su Invoice se marca como **Paid** (no antes, aunque tenga Accrual). Captura nativa + **import en batch**. | 1.2·5 · 4.1 · 4.6 |
+| **Scenario vs. Snapshot** | `Scenario` (mover supuestos, comparar alternativas) existe **solo dentro del UW**, antes de aprobar el Project. Una vez aprobado, el `Snapshot` es el resumen recurrente de lo aprobado/inicial vs. lo real y lo proyectado hoy — no hay edición de escenarios en ejecución. | 3.3 |
 
 ---
 
@@ -45,10 +48,10 @@ También se identifican **tres huecos reales** que ninguno de los dos documentos
 | # | Tema | Problema identificado | Por qué importa | Recomendación |
 |---|---|---|---|---|
 | 1 | **Business Plan vs. Cash Flow Engine** | El Blueprint lista "Business Plan" como una capa de arquitectura separada (sección 2) pero también dice que "debe ser el resultado de los demás módulos" y que "no debería recapturar" datos (sección 11). Son dos modelos mentales distintos escondidos bajo el mismo nombre. | Si "Business Plan" se implementa como una tabla/módulo con su propio storage, se reintroduce exactamente la duplicación de supuestos que la tesis central promete eliminar. | **Business Plan no es un módulo con datos propios. Es una vista/orquestador sobre el Cash Flow Engine.** No debe existir una tabla `business_plan_assumptions`; solo lecturas derivadas de Plan, Costs, Revenue y Capital. |
-| 2 | **Deal / Underwriting desaparecido** | El Planteamiento lo pone como etapa 1 del ciclo de vida (`Deal/Underwriting → Planning → Development → Financing → Operations/Sales → Exit`). El Blueprint arranca directo en "Project Setup Wizard", sin un objeto ni flujo de evaluación pre-compromiso. | Un desarrollador evalúa 10 terrenos/oportunidades por cada proyecto que ejecuta. Obligarlo a llenar el wizard completo (schedule, budget, contratos, equipo) para "solo ver si el número cierra" genera fricción y hace que la plataforma no capture el primer momento de valor. | Decisión de producto pendiente (ver sección 8). Recomendación: un modo ligero "Quick Underwriting" que reutiliza los mismos objetos (Project en estado `Draft/Deal`) con un subconjunto mínimo de campos, promovible a "Project" completo si el deal avanza. |
+| 2 | **Deal / Underwriting desaparecido** | El Planteamiento lo pone como etapa 1 del ciclo de vida (`Deal/Underwriting → Planning → Development → Financing → Operations/Sales → Exit`). El Blueprint arranca directo en "Project Setup Wizard", sin un objeto ni flujo de evaluación pre-compromiso. | Un desarrollador evalúa 10 terrenos/oportunidades por cada proyecto que ejecuta. Obligarlo a llenar el wizard completo (schedule, budget, contratos, equipo) para "solo ver si el número cierra" genera fricción y hace que la plataforma no capture el primer momento de valor. | **✔ Decidido:** sí lleva un modo ligero de UW. Un Deal vive en estado `Draft/Deal`, con un subconjunto mínimo de campos y la capacidad de mover supuestos (ver Scenario en 3.3), y se **promueve a Project** (con Baseline fijado) solo cuando se aprueba. |
 | 3 | **Motor de permisos como rules-engine** | 3 dimensiones (Module Access, Action Permission, Data Scope) + Approval Rules configurables por objeto/monto/rol + Custom Role. | Es una cantidad de superficie de configuración comparable a la de un ERP. Construir esto "bien" antes de tener casos reales de uso probablemente produce el diseño equivocado de permisos, no el correcto. | El **modelo de datos** debe soportar las 3 dimensiones desde el día 1 (para no migrar datos después). La **UI y lógica de negocio del MVP** solo expone roles predeterminados fijos + 2-3 reglas de aprobación hardcodeadas por monto. Ver sección 5. |
-| 4 | **Scenario vs. Snapshot, relación no definida** | "Scenario Overrides" (Base/Downside/Upside, basados en overrides sobre un escenario base) y "Baseline/Current/Actual" (tres estados transversales con snapshot mensual) se documentan en secciones distintas sin decir si un Snapshot es un tipo de Scenario, si son estructuras independientes, o si el Actual "es" un escenario. | Sin esta decisión, cualquier ingeniero que modele las tablas va a inventar su propia respuesta, y probablemente distinta de lo que el resto del equipo espera. | Ver sección 3.3 — se propone una jerarquía explícita: `Scenario` (hipotético, con overrides) es distinto de `Snapshot` (histórico, inmutable, generado en Monthly Close). Baseline y Actual son *tipos de Snapshot*; Current Forecast es el estado "vivo" (no un snapshot, es la data actual sin congelar). |
-| 5 | **Fuente de los "Actuals"** | El Monthly Close (paso 1: "Import/update actuals") y el dashboard ejecutivo asumen que existen actuals de costo y cobranza, pero el documento excluye explícitamente integraciones contables del alcance inicial. | Sin un mecanismo definido, "Actual" es un concepto vacío en el MVP — el rolling forecast no tiene con qué compararse ni de qué alimentarse más allá de lo que ya vive nativamente en la plataforma (invoices/payments capturados a mano). | El MVP resuelve Actuals de **dos fuentes nativas** (pagos y facturas capturados en Costs, cobranza capturada en Revenue) **más un import manual vía Excel/CSV con mapeo de columnas** para lo que aún vive en el sistema contable del cliente. No prometer "integración contable" en V1; prometer "import de actuals". |
+| 4 | **Scenario vs. Snapshot, relación no definida** | "Scenario Overrides" (Base/Downside/Upside, basados en overrides sobre un escenario base) y "Baseline/Current/Actual" (tres estados transversales con snapshot mensual) se documentan en secciones distintas sin decir si un Snapshot es un tipo de Scenario, si son estructuras independientes, o si el Actual "es" un escenario. | Sin esta decisión, cualquier ingeniero que modele las tablas va a inventar su propia respuesta, y probablemente distinta de lo que el resto del equipo espera. | **✔ Decidido** (ver 3.3): `Scenario` existe **únicamente durante el UW** — es donde se mueven supuestos para comparar alternativas antes de aprobar. Al aprobar, el escenario elegido se congela como Baseline. En ejecución ya no hay Scenarios editables: el `Snapshot` mensual es el resumen de lo aprobado/inicial vs. lo real y lo proyectado hoy. |
+| 5 | **Fuente de los "Actuals"** | El Monthly Close (paso 1: "Import/update actuals") y el dashboard ejecutivo asumen que existen actuals de costo y cobranza, pero el documento excluye explícitamente integraciones contables del alcance inicial. | Sin un mecanismo definido, "Actual" es un concepto vacío en el MVP — el rolling forecast no tiene con qué compararse ni de qué alimentarse más allá de lo que ya vive nativamente en la plataforma (invoices/payments capturados a mano). | **✔ Decidido:** actuals en **cash basis** — un costo se reconoce como Actual cuando su `Invoice` pasa a estado **Paid** (Accrued no cuenta como Actual, solo refina el forecast remanente). Fuente: captura nativa (marcar invoice como pagada) **más import en batch** (Excel/CSV) para lo que ya se pagó fuera de la plataforma. No se promete integración contable en V1. |
 | 6 | **Funding waterfall configurable** | Equity First, Pari Passu y Custom Waterfall se listan como mecánicas soportadas desde el inicio. | Un motor de waterfall genérico y configurable es, otra vez, ingeniería especulativa: la inmensa mayoría de desarrolladores pequeños/medianos en su primer crédito de construcción usan Equity First simple. | MVP: Equity First hardcodeado. El modelo de datos debe permitir agregar reglas de waterfall alternativas después (no debe estar hardcodeado *en el schema*, sí en la lógica de cálculo inicial). |
 | 7 | **"Configurable, not custom-built" sin límites** | Es un principio de producto correcto pero, tal como está escrito, no dice qué es configurable ni hasta dónde. | Sin límites explícitos, cualquier feature request se puede justificar como "solo es hacerlo configurable". Es la puerta de entrada clásica al scope creep de un producto B2B vertical. | Convertirlo en una lista cerrada (sección 6): en V1 solo son configurables la librería de cost codes, la estructura de schedule por template, y los supuestos del revenue engine — nada más. Todo lo demás (permisos, approvals, waterfall, reportes) es fijo en V1. |
 | 8 | **Phase/Asset para proyectos mixtos** | Buen diseño para el futuro (hotel + retail + residencial en un mismo desarrollo), pero introduce complejidad de rollup (¿cómo se agregan schedule, budget y cash flow de múltiples fases con distintos revenue engines?) que ningún documento explica. | Resolver el rollup multi-fase multi-asset-class correctamente es, otra vez, un proyecto de ingeniería considerable, y no es necesario para validar la tesis central con el primer cliente. | El modelo de datos mantiene `Phase` como entidad desde el día 1 (todo Project tiene al menos 1 Phase implícita), pero el **MVP no expone UI para múltiples fases o múltiples asset classes por proyecto.** Un proyecto = un asset class = una fase, en V1. |
@@ -180,17 +183,17 @@ erDiagram
 
 ### 3.3 Decisión de modelado: `Scenario` vs. `Snapshot` (resuelve el hueco #4 de la sección 1)
 
-Los dos documentos usan casi el mismo vocabulario para dos cosas distintas. Se proponen como **conceptos separados y no intercambiables**:
+**Decisión de la fundadora, ya incorporada como modelo definitivo:** `Scenario` y `Snapshot` no conviven en el tiempo — pertenecen a etapas distintas del ciclo de vida del proyecto y no son intercambiables.
 
-| Concepto | Qué es | Mutabilidad | Ejemplo |
+| Concepto | Qué es | Cuándo existe | Mutabilidad |
 |---|---|---|---|
-| **Scenario** | Un conjunto de *overrides hipotéticos* sobre los supuestos vigentes, para responder "¿qué pasaría si...?" | Editable, se puede recalcular en vivo | "Downside: precio -10%, construcción +8%, +6 meses" |
-| **Snapshot** | Una *fotografía inmutable* del business plan completo en un momento dado, generada por el Monthly Close | Inmutable una vez creado | "Snapshot Febrero 2027" |
-| **Baseline** | El primer `Snapshot` de un proyecto (o el marcado explícitamente como plan aprobado) | Inmutable | Se fija al aprobar el proyecto |
-| **Current Forecast** | **No es un Snapshot.** Es el estado vivo y editable de Plan+Costs+Revenue+Capital *ahora mismo* | Mutable constantemente | Lo que ve el usuario día a día |
-| **Actual** | Datos reales capturados (pagos, cobranzas, avance) hasta la fecha de corte; se congela dentro de cada `Snapshot` mensual | Inmutable retroactivamente una vez cerrado el mes | Parte del Snapshot mensual |
+| **Scenario** | Conjunto de *overrides hipotéticos* sobre los supuestos (precio, costo, ritmo de venta, tasa, plazo) para comparar alternativas — "¿qué pasaría si...?" | **Solo durante el Deal/Underwriting**, antes de que el proyecto se apruebe. Un Deal puede tener varios Scenarios (Base/Downside/Upside) mientras se evalúa. | Editable y recalculable en vivo mientras el Deal está en UW |
+| **Baseline** | El `Scenario` que se **elige y aprueba** al promover el Deal a Project. Se congela como el primer `Snapshot`. | Se fija exactamente una vez, al aprobar | Inmutable desde ese momento |
+| **Current Forecast** | El estado vivo y editable de Plan+Costs+Revenue+Capital *ahora mismo*, en ejecución | Desde que el Project está aprobado, todo el tiempo | Mutable constantemente — **no** es un Scenario ni se edita por overrides hipotéticos |
+| **Actual** | Lo realmente ocurrido a la fecha de corte (ver 4.1: costos = invoices pagadas) | Desde que el Project está aprobado, se acumula cada mes | Se congela dentro de cada `Snapshot` mensual |
+| **Snapshot** | La fotografía mensual que resume, para ese corte: **Baseline (lo aprobado/inicial) vs. Actual (lo real) vs. Current Forecast (lo proyectado hoy)** | Se genera en cada Monthly Close, durante toda la ejecución | Inmutable una vez creado |
 
-Con esto: *Baseline vs. Current vs. Actual* (sección 10 del Planteamiento) se resuelve comparando **Snapshots** (Baseline = primer snapshot, Actual = lo realizado dentro de cada snapshot) contra el **estado vivo** (Current Forecast). *Scenario* es una herramienta de análisis "what-if" que **nunca se confunde con un Snapshot histórico** — no se pueden cerrar meses sobre un Scenario hipotético, solo sobre el Current Forecast real.
+**En una frase:** *Scenario* es la caja de arena del Underwriting — ahí se mueven supuestos para decidir si y cómo aprobar el Deal. Una vez aprobado, esa libertad se cierra: ya no hay Scenarios editables en ejecución, solo el ciclo mensual Baseline→Actual→Current Forecast que el `Snapshot` resume. Esto también simplifica el MVP: no hace falta un motor de escenarios "always-on" en Business Plan (sección 6), solo dentro del wizard de UW.
 
 ---
 
@@ -211,16 +214,15 @@ stateDiagram-v2
   note right of Committed
     Uncommitted = Current Budget − Committed
   end note
-  note right of Accrued
-    Actual Cost = Paid + Accrued no facturado
-  end note
   note right of Paid
+    Actual Cost = suma de Invoices en estado Paid (cash basis)
+    Accrued NO cuenta como Actual — solo refina el Forecast to Complete
     Forecast to Complete = Current Budget − Actual Cost (ajustado por forecast method)
     Forecast Final Cost = Actual Cost + Forecast to Complete
   end note
 ```
 
-**Por qué importa modelarlo así:** cada `BudgetLine` debe poder responder, en cualquier momento, cinco números distintos (Original, Current, Committed, Actual, Forecast Final) sin que ninguno se capture manualmente — todos se derivan de las transacciones (`Contract`, `ChangeOrder`, `Accrual`, `Invoice`, `Payment`) ligadas a ella. Si en el MVP se permite editar "Forecast Final Cost" directamente sobre la partida sin pasar por el método de forecast (sección 4.2), se rompe la trazabilidad y se reintroduce el Excel disfrazado de software.
+**Por qué importa modelarlo así:** cada `BudgetLine` debe poder responder, en cualquier momento, cinco números distintos (Original, Current, Committed, Actual, Forecast Final) sin que ninguno se capture manualmente — todos se derivan de las transacciones (`Contract`, `ChangeOrder`, `Accrual`, `Invoice`, `Payment`) ligadas a ella. **Decisión de la fundadora:** el reconocimiento de Actual es en *cash basis* — una partida solo pasa a Actual cuando su `Invoice` se marca como **Paid**; el `Accrual` (avance reconocido, aún no facturado) sigue siendo insumo del forecast remanente, pero nunca de Actual. Esto simplifica el MVP frente a un reconocimiento devengado (accrual accounting) completo, al costo de que Actual Cost puede ir un poco "atrasado" respecto al avance físico real — trade-off aceptado deliberadamente. Si en el MVP se permite editar "Forecast Final Cost" directamente sobre la partida sin pasar por el método de forecast (sección 4.2), se rompe la trazabilidad y se reintroduce el Excel disfrazado de software.
 
 ### 4.2 Cost Forecast mensual (rolling forecast)
 
@@ -283,11 +285,11 @@ La atribución de varianza (ejemplo del Blueprint: "-40 bps por retraso, -70 bps
 
 ### 4.6 Monthly Close
 
-Los 9 pasos del Blueprint son correctos como flujo; se ajustan aquí para reflejar que el paso 1 depende de un mecanismo de import definido (hueco #5):
+Los 9 pasos del Blueprint son correctos como flujo; se ajustan aquí para reflejar la decisión sobre el hueco #5 — actuals en cash basis vía invoices pagadas:
 
 ```mermaid
 graph TD
-  S1["1. Importar actuals<br/>(pagos, cobranza, avance)<br/>vía captura nativa + import Excel/CSV"] --> S2["2. Revisar budget,<br/>compromisos y change orders"]
+  S1["1. Marcar invoices como Paid<br/>(captura nativa + import batch Excel/CSV)<br/>→ dispara el reconocimiento de Actuals"] --> S2["2. Revisar budget,<br/>compromisos y change orders"]
   S2 --> S3["3. Actualizar forecast<br/>de costo remanente"]
   S3 --> S4["4. Actualizar schedule<br/>y milestones"]
   S4 --> S5["5. Actualizar supuestos<br/>de ventas/cobranza"]
@@ -323,7 +325,7 @@ Esta es la tabla más importante del documento — es la que evita tanto el sub-
 | Budget/Commitment/Accrual/Invoice/Payment | Sí | Sí | Núcleo del producto |
 | Rolling cost forecast mensual | Sí | Sí | Núcleo del producto |
 | Baseline/Current/Actual (Snapshot mensual) | Sí | Sí | Núcleo del producto |
-| Scenario overrides (Base/Downside/Upside) | Sí (tabla `Scenario`) | **Parcial** — solo 1 escenario alterno editable manualmente, sin motor de sensibilidad | Evita duplicar todo el proyecto por escenario |
+| Scenario overrides (Base/Downside/Upside) | Sí (tabla `Scenario`) | **Sí, pero acotado al Deal/UW** — múltiples Scenarios mientras se evalúa el Deal; ninguno editable ya aprobado el Project | Decisión de la fundadora (3.3): scope de Scenario = solo UW, sin motor de sensibilidad en ejecución |
 | Multi asset class (Lease, Multifamily, Hotel) | Sí (campo `assetClass`, `RevenueEngine` como interfaz) | **No** — solo For Sale implementado | Construir el 2º motor real informa la abstracción correcta |
 | Multi-phase / mixed-use | Sí (entidad `Phase` siempre presente) | **No** — UI limita a 1 fase por proyecto | — |
 | Deal/Underwriting ligero | Sí (`Project.status = Deal`) | **Sí, mínimo** — reutiliza el wizard con 5 campos, sin schedule/team completo | Resuelve el hueco #2; es barato si el modelo ya soporta el estado |
@@ -345,13 +347,13 @@ Más angosto que el "MVP 1" del Blueprint en los puntos marcados con ⚠️, con
 
 | Módulo | Alcance MVP propuesto | Corte respecto al Blueprint | Justificación del corte |
 |---|---|---|---|
-| **Core** | Project setup (incl. modo Deal ligero), roles fijos, team por proyecto, internal/external collaborator | ⚠️ Sin Custom Role, sin Data Scope granular editable | Roles fijos cubren el 90% de los casos de un equipo de <15 personas |
+| **Core** | Project setup **con modo Deal/UW** (estado `Draft/Deal`, Scenarios comparables, promoción a Project al aprobar), roles fijos, team por proyecto, internal/external collaborator | ⚠️ Sin Custom Role, sin Data Scope granular editable | Roles fijos cubren el 90% de los casos de un equipo de <15 personas; el modo Deal es explícitamente parte del MVP (decisión de la fundadora) |
 | **Plan** | Schedule, Gantt, milestones, dependencias, 1 sola fase por proyecto | ⚠️ Sin multi-fase/mixed-use | Un proyecto residencial típico no lo necesita para validar la tesis |
 | **Costs** | Budget jerárquico, contratos, change orders, invoices, payments, forecast mensual con los 8 métodos de curva | Igual que el Blueprint | Es el módulo más maduro del planteamiento; construirlo completo |
 | **Cost Forecast** | Rolling forecast automático (sección 4.2) | Igual que el Blueprint | Núcleo técnico |
 | **Revenue** | Solo motor **For Sale** (inventario, pricing, absorción, payment plans, cobranza) | ⚠️ Sin Lease/Multifamily/Hotel | Un solo motor bien hecho > cuatro motores mediocres |
 | **Capital** | Equity (sources, contributions), 1 crédito de construcción, draws automáticos, Equity First hardcodeado | ⚠️ Sin waterfall configurable, sin covenants avanzados | Cubre "cuánto equity necesito el próximo mes" sin construir un motor de waterfall genérico |
-| **Business Plan** | Cash flow del proyecto, Sources & Uses, IRR, MOIC, NPV; Scenario manual simple (1 alterno) | ⚠️ Sin motor de sensibilidad multi-variable | Valida la promesa central sin construir el Impact Engine |
+| **Business Plan** | Cash flow del proyecto, Sources & Uses, IRR, MOIC, NPV. Los Scenarios viven en el módulo de Deal/UW (no aquí); en ejecución, Business Plan solo muestra Baseline vs. Actual vs. Current Forecast por Snapshot | ⚠️ Sin motor de sensibilidad multi-variable en ejecución | Valida la promesa central sin construir el Impact Engine; el "qué pasaría si" ya se resolvió en el UW antes de aprobar |
 | **Monthly Close** | Flujo completo de 9 pasos, genera Snapshot | Igual que el Blueprint | Es el hábito recurrente que retiene al usuario |
 | **Governance** | Approvals hardcodeados (Change Order y Budget Change por monto), notifications básicas, audit trail en objetos financieros | ⚠️ Sin motor de reglas configurable | — |
 | **Reporting** | Dashboard, Budget vs Actual, Cost Forecast, Business Plan/Returns, export a Excel | ⚠️ Reducido de ~15 reportes a 4-5 | Los demás reportes son recortes distintos de los mismos datos — se agregan cuando un cliente real los pida, no antes |
@@ -370,7 +372,7 @@ Más angosto que el "MVP 1" del Blueprint en los puntos marcados con ⚠️, con
 |---|---|---|
 | 1 | Home / Mis Proyectos | Reemplaza "Portfolio Home" — lista simple, sin analytics consolidado |
 | 2 | Project Dashboard | Unifica el "Dashboard ejecutivo" del Planteamiento y el "Project Overview" del Blueprint |
-| 3 | Project Setup Wizard (incl. modo Deal rápido) | Agrega el modo ligero de underwriting |
+| 3 | Project Setup Wizard (incl. modo Deal/UW rápido, con comparación de Scenarios) | Agrega el modo ligero de underwriting; aquí y solo aquí se mueven supuestos y se comparan Scenarios antes de aprobar |
 | 4 | Project Team & Permisos | Roles fijos, sin editor de permisos custom |
 | 5 | Schedule / Gantt | — |
 | 6 | Budget (jerárquico) | — |
@@ -416,15 +418,15 @@ Más angosto que el "MVP 1" del Blueprint en los puntos marcados con ⚠️, con
 
 | # | Decisión | Opciones | Recomendación | Por qué es urgente decidirlo ahora |
 |---|---|---|---|---|
-| 1 | ¿El MVP incluye un modo "Deal/Underwriting" ligero? | (a) No, arrancar directo en Project Setup completo; (b) Sí, wizard reducido promovible a Project | **(b)** | Define el primer momento de valor y si el modelo de `Project` necesita un estado `Draft/Deal` desde el diseño de tablas |
+| 1 | ¿El MVP incluye un modo "Deal/Underwriting" ligero? | (a) No, arrancar directo en Project Setup completo; (b) Sí, wizard reducido promovible a Project | **✔ Decidido: (b)** — además, el Deal permite mover supuestos y comparar Scenarios antes de aprobar (ver 3.3) | Define el primer momento de valor y si el modelo de `Project` necesita un estado `Draft/Deal` desde el diseño de tablas |
 | 2 | ¿Cuál es el mercado inicial (moneda, fiscalidad)? | México / LatAm con IVA-retención; o mercado sin esas particularidades | Definir explícitamente antes de diseñar `Contract`/`Invoice` | Agregar campos de impuestos después implica migrar todas las tablas financieras |
-| 3 | ¿Cómo entran los "Actuals" en el MVP? | (a) Solo lo capturado nativamente (invoices/payments/collections); (b) + import manual Excel/CSV; (c) integración contable real | **(b)** | Sin esto, el Monthly Close no tiene qué "importar" en su paso 1 |
+| 3 | ¿Cómo entran los "Actuals" en el MVP? | (a) Solo lo capturado nativamente; (b) + import manual Excel/CSV; (c) integración contable real | **✔ Decidido: (b), en cash basis** — Actual = Invoice marcada como Paid, capturada a mano o importada en batch | Sin esto, el Monthly Close no tiene qué "importar" en su paso 1 |
 | 4 | ¿Se soporta más de un asset class en el MVP? | (a) Solo Residential for Sale; (b) Residential + 1 más | **(a)** | Cada motor adicional es meses de trabajo; validar con uno antes de generalizar |
 | 5 | ¿Se soporta multi-fase/mixed-use en la UI del MVP? | (a) No, 1 fase por proyecto; (b) Sí desde V1 | **(a)** | El rollup multi-fase es complejidad no validada aún |
 | 6 | ¿Permisos configurables por el usuario en V1? | (a) Roles fijos predeterminados; (b) Editor de roles/permisos custom | **(a)** | Un editor de permisos es una feature de producto maduro, no de MVP |
 | 7 | ¿Qué funding waterfall se soporta en V1? | (a) Solo Equity First; (b) Configurable desde V1 | **(a)** | Cubre el caso real de la mayoría de desarrolladores pequeños/medianos |
 | 8 | ¿Cuántos reportes estándar entran al MVP? | (a) 4-5 reportes core; (b) Los ~15 del Blueprint | **(a)** | Cada reporte es una superficie de mantenimiento; agregar bajo demanda real |
-| 9 | ¿El Business Plan permite capturar assumptions manualmente o solo lee de otros módulos? | (a) Solo lectura derivada; (b) Permite overrides manuales "temporales" | **(a), estrictamente** | Permitir overrides manuales reintroduce la duplicación que la tesis central promete eliminar |
+| 9 | ¿El Business Plan permite capturar assumptions manualmente o solo lee de otros módulos? | (a) Solo lectura derivada; (b) Permite overrides manuales "temporales" | **✔ Decidido: (a), estrictamente** — consistente con que los overrides ("Scenarios") solo existen en el Deal/UW, nunca dentro de Business Plan en ejecución | Permitir overrides manuales reintroduce la duplicación que la tesis central promete eliminar |
 | 10 | ¿Se versiona el linaje de cada assumption desde el día 1? | (a) Sí, aunque no se exponga en UI; (b) Se agrega cuando se construya el Impact Engine | **(a)** | Agregarlo después requiere reconstruir el motor de cálculo, no solo la UI |
 | 11 | ¿Templates de proyecto en V1? | (a) Uno solo (Residential Development), hardcodeado; (b) Sistema de templates configurable | **(a)** | El sistema de templates es prematuro sin 2-3 proyectos reales corriendo |
 | 12 | ¿Portfolio dashboard en V1? | (a) No, solo lista simple de proyectos; (b) Sí, con analytics consolidado | **(a)** | Baja prioridad para un usuario con 1-3 proyectos activos |
