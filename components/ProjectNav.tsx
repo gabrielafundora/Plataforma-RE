@@ -6,7 +6,7 @@ import Link from "next/link";
 export function ProjectNav({ projectId, active }: { projectId: string; active: "overview" | "budget" }) {
   const tabs = [
     { key: "overview", label: "Overview", href: `/projects/${projectId}` },
-    { key: "budget", label: "Budget", href: `/projects/${projectId}/budget` },
+    { key: "budget", label: "Control Presupuestal", href: `/projects/${projectId}/budget` },
   ] as const;
 
   return (

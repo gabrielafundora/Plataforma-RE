@@ -1,12 +1,23 @@
-import Link from "next/link";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { contracts, counterparties, contractRollup, invoices, changeOrders, approvalRequests } from "@/lib/db/schema";
+import {
+  contracts,
+  counterparties,
+  contractRollup,
+  invoices,
+  changeOrders,
+  approvalRequests,
+  budgetLines,
+  costCodes,
+  phases,
+  projects,
+} from "@/lib/db/schema";
 import { formatMoney } from "@/lib/format";
 import { createInvoice, markInvoicePaid } from "@/lib/actions/invoices";
 import { createChangeOrder, decideChangeOrder } from "@/lib/actions/changeOrders";
 import { AppHeader } from "@/components/AppHeader";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Breadcrumb } from "@/components/Breadcrumb";
 
 // Wireframe G — Detalle con tabs (aquí, solo el tab Financial + Invoices,
 // que es lo que este slice necesita probar de punta a punta).
@@ -29,9 +40,17 @@ export default async function ContractDetailPage({
       current: contractRollup.currentAmount,
       paid: contractRollup.paidAmount,
       pending: contractRollup.pendingInvoices,
+      budgetLineId: budgetLines.id,
+      budgetLineCode: costCodes.code,
+      projectId: phases.projectId,
+      projectName: projects.name,
     })
     .from(contracts)
     .innerJoin(counterparties, eq(counterparties.id, contracts.counterpartyId))
+    .innerJoin(budgetLines, eq(budgetLines.id, contracts.budgetLineId))
+    .innerJoin(costCodes, eq(costCodes.id, budgetLines.costCodeId))
+    .innerJoin(phases, eq(phases.id, budgetLines.phaseId))
+    .innerJoin(projects, eq(projects.id, phases.projectId))
     .leftJoin(contractRollup, eq(contractRollup.contractId, contracts.id))
     .where(eq(contracts.id, contractId));
 
@@ -64,7 +83,18 @@ export default async function ContractDetailPage({
 
   return (
     <>
-      <AppHeader crumb={<Link href="/" className="hover:text-blueprint">Mis Proyectos</Link>} />
+      <AppHeader
+        crumb={
+          <Breadcrumb
+            items={[
+              { label: "Mis Proyectos", href: "/" },
+              { label: contract.projectName, href: `/projects/${contract.projectId}` },
+              { label: "Control Presupuestal", href: `/projects/${contract.projectId}/budget` },
+              { label: contract.budgetLineCode, href: `/budget-lines/${contract.budgetLineId}` },
+            ]}
+          />
+        }
+      />
       <main className="mx-auto max-w-3xl px-6 py-12">
         <div className="flex items-start justify-between gap-4">
           <div>

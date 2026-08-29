@@ -68,7 +68,7 @@ export default async function ProjectDashboardPage({
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
           <ModulePanel
-            title="Cost"
+            title="Control Presupuestal"
             live
             href={`/projects/${projectId}/budget`}
             rows={[

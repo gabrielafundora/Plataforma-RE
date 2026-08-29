@@ -5,6 +5,7 @@ import { budgetLines, costCodes, phases, projects, budgetLineRollup } from "@/li
 import { formatMoney } from "@/lib/format";
 import { AppHeader } from "@/components/AppHeader";
 import { ProjectNav } from "@/components/ProjectNav";
+import { Breadcrumb } from "@/components/Breadcrumb";
 
 // Wireframe F — Tabla jerárquica financiera (docs/strategy wireframes, patrón F).
 // The five numbers here are never captured directly — they come from
@@ -39,12 +40,21 @@ export default async function BudgetPage({ params }: { params: Promise<{ project
 
   return (
     <>
-      <AppHeader crumb={<Link href="/" className="hover:text-blueprint">Mis Proyectos</Link>} />
+      <AppHeader
+        crumb={
+          <Breadcrumb
+            items={[
+              { label: "Mis Proyectos", href: "/" },
+              { label: project?.name ?? "Proyecto", href: `/projects/${projectId}` },
+            ]}
+          />
+        }
+      />
       <ProjectNav projectId={projectId} active="budget" />
       <main className="mx-auto max-w-4xl px-6 py-12">
         <div className="flex items-end justify-between">
           <div>
-            <div className="text-sm text-ink-soft">Budget</div>
+            <div className="text-sm text-ink-soft">Control Presupuestal</div>
             <h1 className="mt-1 font-display text-2xl font-semibold text-ink">{project?.name ?? "Proyecto"}</h1>
           </div>
           <div className="text-right">

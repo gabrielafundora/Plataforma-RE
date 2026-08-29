@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { budgetLines, costCodes, contracts, counterparties, contractRollup } from "@/lib/db/schema";
+import { budgetLines, costCodes, contracts, counterparties, contractRollup, phases, projects } from "@/lib/db/schema";
 import { formatMoney } from "@/lib/format";
 import { AppHeader } from "@/components/AppHeader";
+import { Breadcrumb } from "@/components/Breadcrumb";
 
 // Pantalla 7 — Budget Line Detail.
 export const dynamic = "force-dynamic"; // live financial data — never prerendered at build time
@@ -16,9 +17,16 @@ export default async function BudgetLineDetailPage({
   const { budgetLineId } = await params;
 
   const [line] = await db
-    .select({ code: costCodes.code, description: costCodes.description })
+    .select({
+      code: costCodes.code,
+      description: costCodes.description,
+      projectId: phases.projectId,
+      projectName: projects.name,
+    })
     .from(budgetLines)
     .innerJoin(costCodes, eq(costCodes.id, budgetLines.costCodeId))
+    .innerJoin(phases, eq(phases.id, budgetLines.phaseId))
+    .innerJoin(projects, eq(projects.id, phases.projectId))
     .where(eq(budgetLines.id, budgetLineId));
 
   const contractRows = await db
@@ -38,7 +46,17 @@ export default async function BudgetLineDetailPage({
 
   return (
     <>
-      <AppHeader crumb={<Link href="/" className="hover:text-blueprint">Mis Proyectos</Link>} />
+      <AppHeader
+        crumb={
+          <Breadcrumb
+            items={[
+              { label: "Mis Proyectos", href: "/" },
+              { label: line?.projectName ?? "Proyecto", href: `/projects/${line?.projectId}` },
+              { label: "Control Presupuestal", href: `/projects/${line?.projectId}/budget` },
+            ]}
+          />
+        }
+      />
       <main className="mx-auto max-w-3xl px-6 py-12">
         <div className="text-sm text-ink-soft">Budget Line</div>
         <h1 className="mt-1 font-display text-2xl font-semibold text-ink">
