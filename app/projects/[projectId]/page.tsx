@@ -6,6 +6,7 @@ import { formatMoney } from "@/lib/format";
 import { AppHeader } from "@/components/AppHeader";
 import { ProjectNav } from "@/components/ProjectNav";
 import { StatusBadge } from "@/components/StatusBadge";
+import { deleteProject } from "@/lib/actions/projects";
 
 // Pantalla 2 — Project Dashboard (Wireframe B). Responde en segundos
 // "¿cómo va el proyecto?" — pero solo para lo que esta slice realmente
@@ -87,6 +88,34 @@ export default async function ProjectDashboardPage({
           <ModulePanel title="Revenue" rows={[]} />
           <ModulePanel title="Capital" rows={[]} />
         </div>
+
+        <details className="mt-12 group">
+          <summary className="cursor-pointer text-sm font-medium text-redline/70 hover:text-redline">
+            Zona de peligro
+          </summary>
+          <div className="mt-3 rounded-xl border border-redline/40 bg-redline-soft p-4">
+            <p className="text-sm font-medium text-redline">⚠ Eliminar este proyecto es irreversible.</p>
+            <p className="mt-1 text-sm text-redline/90">
+              Se borran todas sus partidas, contratos, change orders, facturas, pagos y cambios de
+              presupuesto. No hay forma de recuperarlo después.
+            </p>
+            <form action={deleteProject} className="mt-4 flex flex-wrap items-end gap-3">
+              <input type="hidden" name="projectId" value={projectId} />
+              <label className="flex flex-col gap-1.5 text-xs font-medium text-redline">
+                Escribe &quot;{project.name}&quot; para confirmar
+                <input
+                  name="confirmName"
+                  required
+                  placeholder={project.name}
+                  className="w-64 rounded-lg border border-redline/40 bg-surface px-3 py-1.5 text-sm text-ink"
+                />
+              </label>
+              <button className="rounded-lg bg-redline px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90">
+                Eliminar proyecto
+              </button>
+            </form>
+          </div>
+        </details>
       </main>
     </>
   );
