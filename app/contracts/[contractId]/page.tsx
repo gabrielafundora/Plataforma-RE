@@ -7,6 +7,8 @@ import { createInvoice, markInvoicePaid } from "@/lib/actions/invoices";
 
 // Wireframe G — Detalle con tabs (aquí, solo el tab Financial + Invoices,
 // que es lo que este slice necesita probar de punta a punta).
+export const dynamic = "force-dynamic"; // live financial data — never prerendered at build time
+
 export default async function ContractDetailPage({
   params,
 }: {

@@ -2,6 +2,12 @@ import Link from "next/link";
 import { db } from "@/lib/db/client";
 import { projects } from "@/lib/db/schema";
 
+// Every page here reads live financial data — none of them should be
+// statically prerendered at build time (which would (a) require a
+// reachable DATABASE_URL during the build itself, fragile on Vercel,
+// and (b) bake in stale data). Render per request instead.
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const rows = await db.select().from(projects);
 

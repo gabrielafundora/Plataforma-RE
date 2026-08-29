@@ -5,6 +5,8 @@ import { budgetLines, costCodes, contracts, counterparties, contractRollup } fro
 import { formatMoney } from "@/lib/format";
 
 // Pantalla 7 — Budget Line Detail.
+export const dynamic = "force-dynamic"; // live financial data — never prerendered at build time
+
 export default async function BudgetLineDetailPage({
   params,
 }: {

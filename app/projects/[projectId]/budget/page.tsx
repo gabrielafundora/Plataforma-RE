@@ -7,6 +7,8 @@ import { formatMoney } from "@/lib/format";
 // Wireframe F — Tabla jerárquica financiera (docs/strategy wireframes, patrón F).
 // The five numbers here are never captured directly — they come from
 // budget_line_rollup (see docs/schema/README.md, decisión #1).
+export const dynamic = "force-dynamic"; // live financial data — never prerendered at build time
+
 export default async function BudgetPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
 

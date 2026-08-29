@@ -9,8 +9,11 @@ import * as schema from "./schema";
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
   throw new Error(
-    "DATABASE_URL is not set. Copy .env.example to .env.local and point it " +
-      "at a local Postgres with docs/schema/schema.sql already applied."
+    "DATABASE_URL is not set.\n" +
+      "- Local dev: copy .env.example to .env.local and fill it in.\n" +
+      "- Vercel: Project → Settings → Environment Variables — add it there " +
+      "(check Production/Preview/Development), then Deployments → ⋯ → Redeploy " +
+      "(adding a variable does not restart an existing deployment on its own)."
   );
 }
 
