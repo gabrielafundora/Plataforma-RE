@@ -28,7 +28,7 @@ export default async function HomePage() {
           {rows.map((p) => (
             <li key={p.id}>
               <Link
-                href={`/projects/${p.id}/budget`}
+                href={`/projects/${p.id}`}
                 className="flex items-center justify-between rounded-xl border border-line bg-surface p-5 shadow-sm transition-shadow hover:shadow-md"
               >
                 <div>

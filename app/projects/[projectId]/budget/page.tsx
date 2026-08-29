@@ -4,6 +4,7 @@ import { db } from "@/lib/db/client";
 import { budgetLines, costCodes, phases, projects, budgetLineRollup } from "@/lib/db/schema";
 import { formatMoney } from "@/lib/format";
 import { AppHeader } from "@/components/AppHeader";
+import { ProjectNav } from "@/components/ProjectNav";
 
 // Wireframe F — Tabla jerárquica financiera (docs/strategy wireframes, patrón F).
 // The five numbers here are never captured directly — they come from
@@ -39,6 +40,7 @@ export default async function BudgetPage({ params }: { params: Promise<{ project
   return (
     <>
       <AppHeader crumb={<Link href="/" className="hover:text-blueprint">Mis Proyectos</Link>} />
+      <ProjectNav projectId={projectId} active="budget" />
       <main className="mx-auto max-w-4xl px-6 py-12">
         <div className="flex items-end justify-between">
           <div>
