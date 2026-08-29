@@ -117,6 +117,33 @@ export async function addCostCode(formData: FormData) {
   revalidatePath("/", "layout");
 }
 
+const setInitialBudgetSchema = z.object({
+  budgetLineId: z.string().uuid(),
+  originalAmount: z.coerce.number().min(0),
+});
+
+// Distinta de correctOriginalAmount de abajo: esto es capturar el
+// presupuesto por PRIMERA vez, no corregir un error después del hecho.
+// Aplicar el catálogo por default (o "personalizar") deja cada partida
+// en $0 — llenar ese número no es una excepción ni necesita motivo ni
+// warning, porque todavía no hay nada comprometido ni pagado contra
+// esta partida. La página solo ofrece esta acción mientras
+// Committed=0 y Actual=0; en cuanto hay actividad real, pasa a requerir
+// el flujo con warning de correctOriginalAmount.
+export async function setInitialBudget(formData: FormData) {
+  const parsed = setInitialBudgetSchema.parse({
+    budgetLineId: formData.get("budgetLineId"),
+    originalAmount: formData.get("originalAmount"),
+  });
+
+  await db
+    .update(budgetLines)
+    .set({ originalAmount: String(parsed.originalAmount), updatedAt: new Date() })
+    .where(eq(budgetLines.id, parsed.budgetLineId));
+
+  revalidatePath("/", "layout");
+}
+
 const correctOriginalAmountSchema = z.object({
   budgetLineId: z.string().uuid(),
   originalAmount: z.coerce.number().min(0),

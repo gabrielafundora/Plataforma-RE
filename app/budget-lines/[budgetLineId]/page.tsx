@@ -15,7 +15,7 @@ import {
 import { formatMoney } from "@/lib/format";
 import { AppHeader } from "@/components/AppHeader";
 import { StatusBadge } from "@/components/StatusBadge";
-import { correctOriginalAmount } from "@/lib/actions/budgetSetup";
+import { correctOriginalAmount, setInitialBudget } from "@/lib/actions/budgetSetup";
 import { createContract } from "@/lib/actions/contracts";
 import { createBudgetChange, decideBudgetChange } from "@/lib/actions/budgetChanges";
 import { extractGroupId, stripGroupTag } from "@/lib/budgetChanges/groupTag";
@@ -130,6 +130,10 @@ export default async function BudgetLineDetailPage({
   const committed = Number(line.committed ?? 0);
   const actual = Number(line.actual ?? 0);
   const disponible = current - committed;
+  // Nada comprometido ni pagado todavía -> capturar/editar el original es
+  // seguro, no una excepción. En cuanto hay Committed o Actual, cambiar
+  // el original se vuelve riesgoso y pasa al flujo con warning de abajo.
+  const hasActivity = committed > 0 || actual > 0;
 
   return (
     <>
@@ -154,23 +158,14 @@ export default async function BudgetLineDetailPage({
           <Stat label="Disponible" value={formatMoney(disponible)} tone={disponible < 0 ? "bad" : "good"} />
         </div>
 
-        <details className="mt-4 group">
-          <summary className="cursor-pointer text-sm font-medium text-ink-faint hover:text-ink-soft">
-            Revisar presupuesto original (excepción)
-          </summary>
-          <div className="mt-3 rounded-xl border border-warning/40 bg-warning-soft p-4">
-            <p className="text-sm font-medium text-warning">
-              ⚠ Esto no es el proceso normal para actualizar el presupuesto.
-            </p>
-            <p className="mt-1 text-sm text-warning/90">
-              El presupuesto original no debe moverse una vez dado de alta — para eso están las Aditivas
-              y Rebalanceos de abajo, que sí quedan en el historial y pasan por aprobación. Usa esto
-              únicamente para corregir un error de captura (p.ej. te equivocaste de cifra al dar de alta
-              esta partida).
-            </p>
-            <form action={correctOriginalAmount} className="mt-4 flex flex-wrap items-end gap-3">
+        {!hasActivity ? (
+          <div className="mt-4 rounded-xl border border-line bg-surface p-4 shadow-sm">
+            {original === 0 && (
+              <p className="text-sm font-medium text-ink">Esta partida no tiene presupuesto capturado todavía.</p>
+            )}
+            <form action={setInitialBudget} className="mt-2 flex flex-wrap items-end gap-3">
               <input type="hidden" name="budgetLineId" value={budgetLineId} />
-              <Field label="Nuevo monto original">
+              <Field label={original === 0 ? "Presupuesto de esta partida" : "Nuevo monto original"}>
                 <input
                   type="number"
                   name="originalAmount"
@@ -181,20 +176,58 @@ export default async function BudgetLineDetailPage({
                   className="w-48 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink"
                 />
               </Field>
-              <Field label="Motivo de la corrección">
-                <input
-                  name="reason"
-                  required
-                  placeholder="ej. Error de captura al dar de alta"
-                  className="w-64 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink"
-                />
-              </Field>
-              <button className="rounded-lg bg-warning px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90">
-                Corregir de todas formas
+              <button className="rounded-lg bg-blueprint px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90">
+                Guardar
               </button>
             </form>
+            <p className="mt-2 max-w-lg text-xs text-ink-faint">
+              Todavía no hay nada comprometido ni pagado contra esta partida, así que puedes ajustar este
+              número libremente. En cuanto haya un contrato o una factura, esto pasa a protegerse.
+            </p>
           </div>
-        </details>
+        ) : (
+          <details className="mt-4 group">
+            <summary className="cursor-pointer text-sm font-medium text-ink-faint hover:text-ink-soft">
+              Revisar presupuesto original (excepción)
+            </summary>
+            <div className="mt-3 rounded-xl border border-warning/40 bg-warning-soft p-4">
+              <p className="text-sm font-medium text-warning">
+                ⚠ Esto no es el proceso normal para actualizar el presupuesto.
+              </p>
+              <p className="mt-1 text-sm text-warning/90">
+                El presupuesto original no debe moverse una vez dado de alta — para eso están las Aditivas
+                y Rebalanceos de abajo, que sí quedan en el historial y pasan por aprobación. Usa esto
+                únicamente para corregir un error de captura (p.ej. te equivocaste de cifra al dar de alta
+                esta partida).
+              </p>
+              <form action={correctOriginalAmount} className="mt-4 flex flex-wrap items-end gap-3">
+                <input type="hidden" name="budgetLineId" value={budgetLineId} />
+                <Field label="Nuevo monto original">
+                  <input
+                    type="number"
+                    name="originalAmount"
+                    required
+                    min={0}
+                    step="0.01"
+                    defaultValue={original}
+                    className="w-48 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink"
+                  />
+                </Field>
+                <Field label="Motivo de la corrección">
+                  <input
+                    name="reason"
+                    required
+                    placeholder="ej. Error de captura al dar de alta"
+                    className="w-64 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink"
+                  />
+                </Field>
+                <button className="rounded-lg bg-warning px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90">
+                  Corregir de todas formas
+                </button>
+              </form>
+            </div>
+          </details>
+        )}
 
         <h2 className="mt-10 text-sm font-medium text-ink-soft">Cambios de presupuesto</h2>
         <ul className="mt-3 grid gap-3">
