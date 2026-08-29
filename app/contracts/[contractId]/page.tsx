@@ -69,7 +69,7 @@ export default async function ContractDetailPage({
     return (
       <>
         <AppHeader />
-        <main className="mx-auto max-w-3xl px-6 py-12 text-ink-soft">Contrato no encontrado.</main>
+        <main className="mx-auto max-w-6xl px-6 py-12 text-ink-soft">Contrato no encontrado.</main>
       </>
     );
   }
@@ -77,7 +77,7 @@ export default async function ContractDetailPage({
   return (
     <>
       <AppHeader crumb={<Link href="/" className="hover:text-blueprint">Mis Proyectos</Link>} />
-      <main className="mx-auto max-w-3xl px-6 py-12">
+      <main className="mx-auto max-w-6xl px-6 py-12">
         <Link
           href={`/projects/${contract.projectId}/budget`}
           className="inline-flex items-center gap-1.5 text-sm font-medium text-blueprint hover:underline"

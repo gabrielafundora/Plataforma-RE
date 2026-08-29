@@ -16,7 +16,7 @@ export default async function HomePage() {
   return (
     <>
       <AppHeader />
-      <main className="mx-auto max-w-4xl px-6 py-12">
+      <main className="mx-auto max-w-6xl px-6 py-12">
         <h1 className="font-display text-3xl font-semibold text-ink">Mis Proyectos</h1>
         <p className="mt-2 max-w-xl text-sm text-ink-soft">
           Vertical slice 1 — Costs + Cash Flow Engine. Sin login todavía; corre{" "}

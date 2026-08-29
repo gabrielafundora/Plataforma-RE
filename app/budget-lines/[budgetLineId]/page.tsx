@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, like, ne } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import {
   budgetLines,
@@ -9,17 +9,23 @@ import {
   contractRollup,
   phases,
   budgetLineRollup,
+  budgetChanges,
+  approvalRequests,
 } from "@/lib/db/schema";
 import { formatMoney } from "@/lib/format";
 import { AppHeader } from "@/components/AppHeader";
 import { StatusBadge } from "@/components/StatusBadge";
-import { updateBudgetLineAmount } from "@/lib/actions/budgetSetup";
+import { correctOriginalAmount } from "@/lib/actions/budgetSetup";
 import { createContract } from "@/lib/actions/contracts";
+import { createBudgetChange, decideBudgetChange } from "@/lib/actions/budgetChanges";
+import { extractGroupId, stripGroupTag } from "@/lib/budgetChanges/groupTag";
 import { getDevOrgId } from "@/lib/auth/devUser";
 
-// Pantalla 7 — Budget Line Detail. El presupuesto de una partida se
-// define aquí; los contratos que des de alta abajo son lo que empieza
-// a "consumirlo" (Committed), y sus facturas pagadas lo que consume el
+// Pantalla 7 — Budget Line Detail. El presupuesto original se define una
+// vez; a partir de ahí "Current" sólo se mueve vía Aditivas/Rebalanceos
+// aprobados (budget_line_rollup: original + budget_changes aprobados).
+// Los contratos que des de alta abajo son lo que empieza a "consumir"
+// ese Current (Committed), y sus facturas pagadas lo que consume el
 // Actual — el ciclo completo Budget → Contract → Invoice.
 export const dynamic = "force-dynamic";
 
@@ -47,6 +53,15 @@ export default async function BudgetLineDetailPage({
     .leftJoin(budgetLineRollup, eq(budgetLineRollup.budgetLineId, budgetLines.id))
     .where(eq(budgetLines.id, budgetLineId));
 
+  if (!line) {
+    return (
+      <>
+        <AppHeader />
+        <main className="mx-auto max-w-6xl px-6 py-12 text-ink-soft">Partida no encontrada.</main>
+      </>
+    );
+  }
+
   const contractRows = await db
     .select({
       id: contracts.id,
@@ -68,14 +83,47 @@ export default async function BudgetLineDetailPage({
     .from(counterparties)
     .where(eq(counterparties.organizationId, orgId));
 
-  if (!line) {
-    return (
-      <>
-        <AppHeader />
-        <main className="mx-auto max-w-3xl px-6 py-12 text-ink-soft">Partida no encontrada.</main>
-      </>
-    );
-  }
+  const changeRows = await db
+    .select({
+      id: budgetChanges.id,
+      amount: budgetChanges.amount,
+      reason: budgetChanges.reason,
+      approvedAt: budgetChanges.approvedAt,
+      requiredRole: approvalRequests.requiredRole,
+      status: approvalRequests.status,
+    })
+    .from(budgetChanges)
+    .leftJoin(
+      approvalRequests,
+      and(eq(approvalRequests.entityType, "budget_change"), eq(approvalRequests.entityId, budgetChanges.id))
+    )
+    .where(eq(budgetChanges.budgetLineId, budgetLineId))
+    .orderBy(desc(budgetChanges.createdAt));
+
+  // Para un rebalanceo (dos filas atadas por un tag de grupo, ver
+  // lib/actions/budgetChanges.ts) buscamos la partida del otro lado del
+  // movimiento nada más para mostrarla — no afecta el cálculo.
+  const changeDisplayRows = await Promise.all(
+    changeRows.map(async (c) => {
+      const groupId = extractGroupId(c.reason);
+      if (!groupId) return { ...c, reason: c.reason, counterpartCode: null as string | null };
+      const [sibling] = await db
+        .select({ code: costCodes.code })
+        .from(budgetChanges)
+        .innerJoin(budgetLines, eq(budgetLines.id, budgetChanges.budgetLineId))
+        .innerJoin(costCodes, eq(costCodes.id, budgetLines.costCodeId))
+        .where(and(like(budgetChanges.reason, `%[grp:${groupId}]%`), ne(budgetChanges.id, c.id)));
+      return { ...c, reason: stripGroupTag(c.reason), counterpartCode: sibling?.code ?? null };
+    })
+  );
+
+  const otherLines = await db
+    .select({ id: budgetLines.id, code: costCodes.code, description: costCodes.description })
+    .from(budgetLines)
+    .innerJoin(costCodes, eq(costCodes.id, budgetLines.costCodeId))
+    .innerJoin(phases, eq(phases.id, budgetLines.phaseId))
+    .where(and(eq(phases.projectId, line.projectId), ne(budgetLines.id, budgetLineId)))
+    .orderBy(costCodes.code);
 
   const original = Number(line.original ?? 0);
   const current = Number(line.current ?? 0);
@@ -86,7 +134,7 @@ export default async function BudgetLineDetailPage({
   return (
     <>
       <AppHeader crumb={<Link href="/" className="hover:text-blueprint">Mis Proyectos</Link>} />
-      <main className="mx-auto max-w-3xl px-6 py-12">
+      <main className="mx-auto max-w-6xl px-6 py-12">
         <Link
           href={`/projects/${line.projectId}/budget`}
           className="inline-flex items-center gap-1.5 text-sm font-medium text-blueprint hover:underline"
@@ -106,30 +154,158 @@ export default async function BudgetLineDetailPage({
           <Stat label="Disponible" value={formatMoney(disponible)} tone={disponible < 0 ? "bad" : "good"} />
         </div>
 
-        <details className="mt-4">
-          <summary className="cursor-pointer text-sm font-medium text-blueprint">Editar monto original</summary>
-          <form action={updateBudgetLineAmount} className="mt-3 flex items-end gap-3 rounded-xl border border-line bg-surface p-4 shadow-sm">
-            <input type="hidden" name="budgetLineId" value={budgetLineId} />
-            <Field label="Nuevo monto original">
-              <input
-                type="number"
-                name="originalAmount"
-                required
-                min={0}
-                step="0.01"
-                defaultValue={original}
-                className="w-48 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink"
-              />
-            </Field>
-            <button className="rounded-lg bg-blueprint px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90">
-              Guardar
-            </button>
-          </form>
-          <p className="mt-2 max-w-lg text-xs text-ink-faint">
-            Edición directa — todavía no hay Baseline/Deal aprobado que proteja este número (§3.3); cuando
-            exista, esto pasará por una solicitud de Budget Change en vez de editarse directo.
-          </p>
+        <details className="mt-4 group">
+          <summary className="cursor-pointer text-sm font-medium text-ink-faint hover:text-ink-soft">
+            Revisar presupuesto original (excepción)
+          </summary>
+          <div className="mt-3 rounded-xl border border-warning/40 bg-warning-soft p-4">
+            <p className="text-sm font-medium text-warning">
+              ⚠ Esto no es el proceso normal para actualizar el presupuesto.
+            </p>
+            <p className="mt-1 text-sm text-warning/90">
+              El presupuesto original no debe moverse una vez dado de alta — para eso están las Aditivas
+              y Rebalanceos de abajo, que sí quedan en el historial y pasan por aprobación. Usa esto
+              únicamente para corregir un error de captura (p.ej. te equivocaste de cifra al dar de alta
+              esta partida).
+            </p>
+            <form action={correctOriginalAmount} className="mt-4 flex flex-wrap items-end gap-3">
+              <input type="hidden" name="budgetLineId" value={budgetLineId} />
+              <Field label="Nuevo monto original">
+                <input
+                  type="number"
+                  name="originalAmount"
+                  required
+                  min={0}
+                  step="0.01"
+                  defaultValue={original}
+                  className="w-48 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink"
+                />
+              </Field>
+              <Field label="Motivo de la corrección">
+                <input
+                  name="reason"
+                  required
+                  placeholder="ej. Error de captura al dar de alta"
+                  className="w-64 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink"
+                />
+              </Field>
+              <button className="rounded-lg bg-warning px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90">
+                Corregir de todas formas
+              </button>
+            </form>
+          </div>
         </details>
+
+        <h2 className="mt-10 text-sm font-medium text-ink-soft">Cambios de presupuesto</h2>
+        <ul className="mt-3 grid gap-3">
+          {changeDisplayRows.map((c) => {
+            const amount = Number(c.amount);
+            return (
+              <li
+                key={c.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-5 shadow-sm"
+              >
+                <div>
+                  <div className="font-medium text-ink">
+                    {c.reason}
+                    {c.counterpartCode && (
+                      <span className="ml-2 text-xs font-normal text-ink-faint">
+                        {amount >= 0 ? "← desde" : "→ hacia"} {c.counterpartCode}
+                      </span>
+                    )}
+                  </div>
+                  <div className={`mt-0.5 text-sm tabular-nums ${amount >= 0 ? "text-success" : "text-redline"}`}>
+                    {amount >= 0 ? "+" : ""}
+                    {formatMoney(amount)}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {c.status === "pending" && c.requiredRole && (
+                    <span className="text-xs text-ink-faint">Requiere: {c.requiredRole.replace(/_/g, " ")}</span>
+                  )}
+                  <StatusBadge status={c.status ?? "pending"} />
+                  {c.status === "pending" && (
+                    <div className="flex items-center gap-2">
+                      <form action={decideBudgetChange}>
+                        <input type="hidden" name="budgetChangeId" value={c.id} />
+                        <input type="hidden" name="decision" value="approved" />
+                        <button className="rounded-lg bg-blueprint px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90">
+                          Aprobar
+                        </button>
+                      </form>
+                      <form action={decideBudgetChange}>
+                        <input type="hidden" name="budgetChangeId" value={c.id} />
+                        <input type="hidden" name="decision" value="rejected" />
+                        <button className="rounded-lg border border-line-strong px-3 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:bg-paper">
+                          Rechazar
+                        </button>
+                      </form>
+                    </div>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+          {changeDisplayRows.length === 0 && (
+            <li className="rounded-xl border border-dashed border-line-strong p-10 text-center text-sm text-ink-soft">
+              Sin cambios de presupuesto todavía.
+            </li>
+          )}
+        </ul>
+
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          <form
+            action={createBudgetChange}
+            className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-5 shadow-sm"
+          >
+            <div className="text-sm font-medium text-ink">+ Aditiva</div>
+            <input type="hidden" name="type" value="aditiva" />
+            <input type="hidden" name="budgetLineId" value={budgetLineId} />
+            <Field label="Monto adicional">
+              <input type="number" name="amount" required min={0} step="0.01" className="w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink" />
+            </Field>
+            <Field label="Motivo">
+              <input name="reason" required placeholder="ej. Alza de precio de acero" className="w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink" />
+            </Field>
+            <button className="mt-1 rounded-lg bg-blueprint px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90">
+              Solicitar aditiva
+            </button>
+            <p className="text-xs text-ink-faint">Sube el presupuesto total del proyecto en esta partida.</p>
+          </form>
+
+          <form
+            action={createBudgetChange}
+            className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-5 shadow-sm"
+          >
+            <div className="text-sm font-medium text-ink">+ Rebalanceo</div>
+            <input type="hidden" name="type" value="rebalanceo" />
+            <input type="hidden" name="budgetLineId" value={budgetLineId} />
+            <Field label="Mover hacia">
+              <select name="destinationBudgetLineId" required className="w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink">
+                <option value="">Selecciona una partida…</option>
+                {otherLines.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.code} — {o.description}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Monto a mover">
+              <input type="number" name="amount" required min={0} step="0.01" className="w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink" />
+            </Field>
+            <Field label="Motivo">
+              <input name="reason" required placeholder="ej. Ahorro en cimentación" className="w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink" />
+            </Field>
+            <button className="mt-1 rounded-lg bg-blueprint px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90">
+              Solicitar rebalanceo
+            </button>
+            <p className="text-xs text-ink-faint">No cambia el total del proyecto — sólo mueve monto entre partidas.</p>
+          </form>
+        </div>
+        <p className="mt-2 max-w-xl text-xs text-ink-faint">
+          Ambas pasan por Approval Authorities (§4.7) y sólo se reflejan en Current una vez aprobadas — un
+          rebalanceo aprueba/rechaza sus dos lados juntos, nunca uno sin el otro.
+        </p>
 
         <h2 className="mt-10 text-sm font-medium text-ink-soft">Contratos</h2>
         <ul className="mt-3 grid gap-3">

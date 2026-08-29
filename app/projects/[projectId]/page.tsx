@@ -46,7 +46,7 @@ export default async function ProjectDashboardPage({
     return (
       <>
         <AppHeader />
-        <main className="mx-auto max-w-4xl px-6 py-12 text-ink-soft">Proyecto no encontrado.</main>
+        <main className="mx-auto max-w-6xl px-6 py-12 text-ink-soft">Proyecto no encontrado.</main>
       </>
     );
   }
@@ -55,7 +55,7 @@ export default async function ProjectDashboardPage({
     <>
       <AppHeader crumb={<Link href="/" className="hover:text-blueprint">Mis Proyectos</Link>} />
       <ProjectNav projectId={projectId} active="overview" />
-      <main className="mx-auto max-w-4xl px-6 py-12">
+      <main className="mx-auto max-w-6xl px-6 py-12">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm text-ink-soft capitalize">

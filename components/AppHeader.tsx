@@ -6,7 +6,7 @@ import Link from "next/link";
 export function AppHeader({ crumb }: { crumb?: React.ReactNode }) {
   return (
     <header className="border-b border-line bg-surface">
-      <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center gap-2.5">
             <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">

@@ -117,21 +117,26 @@ export async function addCostCode(formData: FormData) {
   revalidatePath("/", "layout");
 }
 
-const updateAmountSchema = z.object({
+const correctOriginalAmountSchema = z.object({
   budgetLineId: z.string().uuid(),
   originalAmount: z.coerce.number().min(0),
+  reason: z.string().min(1),
 });
 
-export async function updateBudgetLineAmount(formData: FormData) {
-  const parsed = updateAmountSchema.parse({
+// El presupuesto original NO se debe mover en el curso normal del
+// proyecto — para eso están las Aditivas y Rebalanceos (ver
+// lib/actions/budgetChanges.ts), que sí quedan en el historial y pasan
+// por aprobación. Esta acción es sólo la excepción: corregir un error
+// de captura del original (p.ej. se tecleó mal al dar de alta el
+// presupuesto). Por eso exige un motivo — la advertencia de que esto
+// no es el camino normal vive en la UI, justo antes de este botón.
+export async function correctOriginalAmount(formData: FormData) {
+  const parsed = correctOriginalAmountSchema.parse({
     budgetLineId: formData.get("budgetLineId"),
     originalAmount: formData.get("originalAmount"),
+    reason: formData.get("reason"),
   });
 
-  // Direct edit is a Slice-1 simplification: there's no Baseline/Deal
-  // approval yet (§3.3), so nothing is protecting original_amount from
-  // being wrong at first entry. Once Deal/UW ships, this becomes a
-  // BudgetChange request instead of a bare update.
   await db
     .update(budgetLines)
     .set({ originalAmount: String(parsed.originalAmount), updatedAt: new Date() })

@@ -11,7 +11,7 @@ export function ProjectNav({ projectId, active }: { projectId: string; active: "
 
   return (
     <div className="border-b border-line bg-surface">
-      <nav className="mx-auto flex max-w-4xl gap-1 px-6">
+      <nav className="mx-auto flex max-w-6xl gap-1 px-6">
         {tabs.map((tab) => (
           <Link
             key={tab.key}

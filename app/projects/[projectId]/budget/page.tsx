@@ -102,7 +102,7 @@ export default async function BudgetPage({ params }: { params: Promise<{ project
     <>
       <AppHeader crumb={<Link href="/" className="hover:text-blueprint">Mis Proyectos</Link>} />
       <ProjectNav projectId={projectId} active="budget" />
-      <main className="mx-auto max-w-5xl px-6 py-12">
+      <main className="mx-auto max-w-6xl px-6 py-12">
         <div className="flex items-end justify-between">
           <div>
             <div className="text-sm text-ink-soft">Control Presupuestal</div>
