@@ -5,6 +5,7 @@ import { db } from "@/lib/db/client";
 import { budgetLines, costCodes, phases, projects } from "@/lib/db/schema";
 import { formatMoney } from "@/lib/format";
 import { AppHeader } from "@/components/AppHeader";
+import { FormattedNumberField } from "@/components/FormattedNumberInput";
 import { saveBudgetBaseline } from "@/lib/actions/budgetSetup";
 
 // La única pantalla donde se captura o corrige el presupuesto base —
@@ -161,12 +162,9 @@ export default async function BudgetSetupPage({ params }: { params: Promise<{ pr
                           {isParent ? (
                             <span className="text-xs text-ink-faint">suma de sub-partidas</span>
                           ) : (
-                            <input
-                              type="number"
+                            <FormattedNumberField
                               name={`amount_${g.ownRow!.budgetLineId}`}
                               defaultValue={g.ownRow!.original}
-                              min={0}
-                              step="0.01"
                               className="w-40 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-right text-sm text-ink"
                             />
                           )}
@@ -179,12 +177,9 @@ export default async function BudgetSetupPage({ params }: { params: Promise<{ pr
                           </td>
                           <td className="px-4 py-3 text-ink">{c.description}</td>
                           <td className="px-4 py-3 text-right">
-                            <input
-                              type="number"
+                            <FormattedNumberField
                               name={`amount_${c.budgetLineId}`}
                               defaultValue={c.original}
-                              min={0}
-                              step="0.01"
                               className="w-40 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-right text-sm text-ink"
                             />
                           </td>
