@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { contracts, counterparties, contractRollup, invoices } from "@/lib/db/schema";
+import { contracts, counterparties, contractRollup, invoices, changeOrders, approvalRequests } from "@/lib/db/schema";
 import { formatMoney } from "@/lib/format";
 import { createInvoice, markInvoicePaid } from "@/lib/actions/invoices";
+import { createChangeOrder, decideChangeOrder } from "@/lib/actions/changeOrders";
 import { AppHeader } from "@/components/AppHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 
@@ -36,6 +37,22 @@ export default async function ContractDetailPage({
 
   const invoiceRows = await db.select().from(invoices).where(eq(invoices.contractId, contractId));
 
+  const changeOrderRows = await db
+    .select({
+      id: changeOrders.id,
+      description: changeOrders.description,
+      costImpact: changeOrders.costImpact,
+      scheduleImpactDays: changeOrders.scheduleImpactDays,
+      status: changeOrders.status,
+      requiredRole: approvalRequests.requiredRole,
+    })
+    .from(changeOrders)
+    .leftJoin(
+      approvalRequests,
+      and(eq(approvalRequests.entityType, "change_order"), eq(approvalRequests.entityId, changeOrders.id))
+    )
+    .where(eq(changeOrders.contractId, contractId));
+
   if (!contract) {
     return (
       <>
@@ -64,6 +81,96 @@ export default async function ContractDetailPage({
           <Stat label="Paid" value={formatMoney(contract.paid)} highlight />
           <Stat label="Pending invoices" value={formatMoney(contract.pending)} />
         </div>
+
+        <h2 className="mt-10 text-sm font-medium text-ink-soft">Change Orders</h2>
+        <ul className="mt-3 grid gap-3">
+          {changeOrderRows.map((co) => {
+            const impact = Number(co.costImpact);
+            return (
+              <li
+                key={co.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-5 shadow-sm"
+              >
+                <div>
+                  <div className="font-medium text-ink">{co.description}</div>
+                  <div className="mt-0.5 text-sm tabular-nums text-ink-faint">
+                    <span className={impact > 0 ? "text-redline" : impact < 0 ? "text-success" : ""}>
+                      {impact >= 0 ? "+" : ""}
+                      {formatMoney(impact)}
+                    </span>
+                    {co.scheduleImpactDays !== 0 && <> · {co.scheduleImpactDays > 0 ? "+" : ""}{co.scheduleImpactDays}d schedule</>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {co.status === "submitted" && co.requiredRole && (
+                    <span className="text-xs text-ink-faint">Requiere: {co.requiredRole.replace(/_/g, " ")}</span>
+                  )}
+                  <StatusBadge status={co.status} />
+                  {co.status === "submitted" && (
+                    <div className="flex items-center gap-2">
+                      <form action={decideChangeOrder}>
+                        <input type="hidden" name="changeOrderId" value={co.id} />
+                        <input type="hidden" name="decision" value="approved" />
+                        <button className="rounded-lg bg-blueprint px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90">
+                          Aprobar
+                        </button>
+                      </form>
+                      <form action={decideChangeOrder}>
+                        <input type="hidden" name="changeOrderId" value={co.id} />
+                        <input type="hidden" name="decision" value="rejected" />
+                        <button className="rounded-lg border border-line-strong px-3 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:bg-paper">
+                          Rechazar
+                        </button>
+                      </form>
+                    </div>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+          {changeOrderRows.length === 0 && (
+            <li className="rounded-xl border border-dashed border-line-strong p-10 text-center text-sm text-ink-soft">
+              Sin change orders todavía.
+            </li>
+          )}
+        </ul>
+
+        <form
+          action={createChangeOrder}
+          className="mt-3 flex flex-wrap items-end gap-4 rounded-xl border border-line bg-surface p-5 shadow-sm"
+        >
+          <input type="hidden" name="contractId" value={contract.id} />
+          <Field label="Descripción">
+            <input name="description" required className="w-56 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink" />
+          </Field>
+          <Field label="Cost impact">
+            <input
+              type="number"
+              name="costImpact"
+              required
+              step="0.01"
+              placeholder="ej. 150000 o -50000"
+              className="w-44 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink"
+            />
+          </Field>
+          <Field label="Schedule impact (días)">
+            <input
+              type="number"
+              name="scheduleImpactDays"
+              defaultValue={0}
+              className="w-28 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink"
+            />
+          </Field>
+          <button className="rounded-lg bg-blueprint px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90">
+            Crear change order
+          </button>
+        </form>
+        <p className="mt-2 max-w-lg text-xs text-ink-faint">
+          Al aprobarse, el monto se suma al Current del contrato (arriba) y por lo tanto al Committed de
+          la partida de Budget — sin paso manual. El aprobador requerido se calcula con las Approval
+          Authorities de §4.7 (menos de $100k: Project Management · $100k–$500k: Development · más de
+          $500k: Executive).
+        </p>
 
         <h2 className="mt-10 text-sm font-medium text-ink-soft">Invoices &amp; Payments</h2>
         <ul className="mt-3 grid gap-3">

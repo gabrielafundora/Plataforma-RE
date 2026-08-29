@@ -63,6 +63,27 @@ export const changeOrderStatus = pgEnum("change_order_status", [
   "rejected",
 ]);
 
+export const projectRole = pgEnum("project_role", [
+  "project_admin",
+  "development",
+  "project_management",
+  "construction",
+  "finance",
+  "sales",
+  "executive",
+  "consultant",
+  "contractor",
+]);
+
+export const approvalEntityType = pgEnum("approval_entity_type", [
+  "change_order",
+  "invoice",
+  "budget_change",
+  "debt_draw",
+]);
+
+export const approvalStatus = pgEnum("approval_status", ["pending", "approved", "rejected"]);
+
 export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
@@ -215,6 +236,28 @@ export const payments = pgTable("payments", {
   amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
   paidDate: date("paid_date").notNull(),
   importedViaBatch: boolean("imported_via_batch").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const approvalRules = pgTable("approval_rules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  entityType: approvalEntityType("entity_type").notNull(),
+  thresholdMin: numeric("threshold_min", { precision: 18, scale: 2 }).notNull().default("0"),
+  thresholdMax: numeric("threshold_max", { precision: 18, scale: 2 }),
+  requiredRole: projectRole("required_role").notNull(),
+});
+
+export const approvalRequests = pgTable("approval_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  entityType: approvalEntityType("entity_type").notNull(),
+  entityId: uuid("entity_id").notNull(),
+  amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+  requestedBy: uuid("requested_by").notNull(),
+  requiredRole: projectRole("required_role").notNull(),
+  status: approvalStatus("status").notNull().default("pending"),
+  decidedBy: uuid("decided_by"),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  comment: text("comment"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
