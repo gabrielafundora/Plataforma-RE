@@ -22,7 +22,9 @@ import { RESIDENTIAL_FOR_SALE_CATALOG, isLeaf } from "../costCodes/defaultCatalo
 // the same totals the original single-line demo used — just spread
 // realistically across sub-partidas instead of one lump sum each.
 const LEAF_AMOUNTS: Record<string, string> = {
-  "01": "100000000",
+  "01.01": "90000000",
+  "01.02": "6000000",
+  "01.03": "4000000",
   "02.01": "15000000",
   "02.02": "10000000",
   "02.03": "15000000",
@@ -32,9 +34,13 @@ const LEAF_AMOUNTS: Record<string, string> = {
   "03.03": "70000000",
   "03.04": "50000000",
   "03.05": "20000000",
-  "04": "15000000",
-  "05": "20000000",
-  "06": "15000000",
+  "04.01": "8000000",
+  "04.02": "7000000",
+  "05.01": "8000000",
+  "05.02": "5000000",
+  "05.03": "7000000",
+  "06.01": "10000000",
+  "06.02": "5000000",
 };
 
 async function main() {
