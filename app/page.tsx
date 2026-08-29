@@ -17,12 +17,21 @@ export default async function HomePage() {
     <>
       <AppHeader />
       <main className="mx-auto max-w-6xl px-6 py-12">
-        <h1 className="font-display text-3xl font-semibold text-ink">Mis Proyectos</h1>
-        <p className="mt-2 max-w-xl text-sm text-ink-soft">
-          Vertical slice 1 — Costs + Cash Flow Engine. Sin login todavía; corre{" "}
-          <code className="rounded bg-surface-2 px-1.5 py-0.5 text-xs">npm run db:seed</code> si esta
-          lista está vacía.
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="font-display text-3xl font-semibold text-ink">Mis Proyectos</h1>
+            <p className="mt-2 max-w-xl text-sm text-ink-soft">
+              Vertical slice 1 — Costs + Cash Flow Engine. Sin login todavía — todos los proyectos son de
+              la misma organización de desarrollo.
+            </p>
+          </div>
+          <Link
+            href="/projects/new"
+            className="shrink-0 rounded-lg bg-blueprint px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          >
+            + Nuevo Proyecto
+          </Link>
+        </div>
 
         <ul className="mt-8 grid gap-3 sm:grid-cols-2">
           {rows.map((p) => (

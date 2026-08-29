@@ -2,15 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { invoices, payments } from "@/lib/db/schema";
+import { invoices, payments, approvalRequests } from "@/lib/db/schema";
+import { getDevUserId } from "@/lib/auth/devUser";
+import { resolveRequiredRole } from "@/lib/actions/approvals";
 
 // Implements §7.2·A ("Registrar una factura y ver su impacto en el
-// forecast") for this slice. Approval routing (ApprovalRequest) is
-// deliberately deferred to a later slice — here an invoice moves
-// straight from submitted -> approved so the cash-basis mechanic
-// (decisión 8·03) can be exercised end to end.
+// forecast") plus §4.7 Approval Authorities — invoices now route
+// through the same pending -> approved/rejected pattern as Change
+// Orders (lib/actions/changeOrders.ts) and Budget Changes
+// (lib/actions/budgetChanges.ts), instead of skipping straight to
+// "approved". markInvoicePaid still only makes sense once approved —
+// gated in the UI, not here, same as before.
 
 const createInvoiceSchema = z.object({
   contractId: z.string().uuid(),
@@ -26,15 +30,54 @@ export async function createInvoice(formData: FormData) {
     invoiceDate: formData.get("invoiceDate"),
     netAmount: formData.get("netAmount"),
   });
+  const userId = await getDevUserId();
 
-  await db.insert(invoices).values({
-    contractId: parsed.contractId,
-    invoiceNumber: parsed.invoiceNumber,
-    invoiceDate: parsed.invoiceDate,
-    netAmount: String(parsed.netAmount),
-    status: "approved",
-    approvedAt: new Date(),
+  const [invoice] = await db
+    .insert(invoices)
+    .values({
+      contractId: parsed.contractId,
+      invoiceNumber: parsed.invoiceNumber,
+      invoiceDate: parsed.invoiceDate,
+      netAmount: String(parsed.netAmount),
+      status: "submitted",
+    })
+    .returning();
+
+  const requiredRole = await resolveRequiredRole("invoice", parsed.netAmount);
+  await db.insert(approvalRequests).values({
+    entityType: "invoice",
+    entityId: invoice.id,
+    amount: String(parsed.netAmount),
+    requestedBy: userId,
+    requiredRole,
+    status: "pending",
   });
+
+  revalidatePath("/", "layout");
+}
+
+const decideSchema = z.object({
+  invoiceId: z.string().uuid(),
+  decision: z.enum(["approved", "rejected"]),
+});
+
+export async function decideInvoice(formData: FormData) {
+  const parsed = decideSchema.parse({
+    invoiceId: formData.get("invoiceId"),
+    decision: formData.get("decision"),
+  });
+  const userId = await getDevUserId();
+  const decidedAt = new Date();
+
+  await db
+    .update(invoices)
+    .set({ status: parsed.decision, approvedBy: userId, approvedAt: decidedAt })
+    .where(eq(invoices.id, parsed.invoiceId));
+
+  await db
+    .update(approvalRequests)
+    .set({ status: parsed.decision, decidedBy: userId, decidedAt })
+    .where(and(eq(approvalRequests.entityType, "invoice"), eq(approvalRequests.entityId, parsed.invoiceId)));
 
   revalidatePath("/", "layout");
 }

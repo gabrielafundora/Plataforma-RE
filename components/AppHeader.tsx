@@ -19,7 +19,12 @@ export function AppHeader({ crumb }: { crumb?: React.ReactNode }) {
             Slice 1 · Costs
           </span>
         </div>
-        {crumb && <div className="text-sm text-ink-soft">{crumb}</div>}
+        <div className="flex items-center gap-5 text-sm text-ink-soft">
+          <Link href="/approvals" className="hover:text-blueprint">
+            Aprobaciones
+          </Link>
+          {crumb}
+        </div>
       </div>
     </header>
   );

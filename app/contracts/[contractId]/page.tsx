@@ -12,7 +12,7 @@ import {
   phases,
 } from "@/lib/db/schema";
 import { formatMoney } from "@/lib/format";
-import { createInvoice, markInvoicePaid } from "@/lib/actions/invoices";
+import { createInvoice, decideInvoice, markInvoicePaid } from "@/lib/actions/invoices";
 import { createChangeOrder, decideChangeOrder } from "@/lib/actions/changeOrders";
 import { AppHeader } from "@/components/AppHeader";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -47,7 +47,18 @@ export default async function ContractDetailPage({
     .leftJoin(contractRollup, eq(contractRollup.contractId, contracts.id))
     .where(eq(contracts.id, contractId));
 
-  const invoiceRows = await db.select().from(invoices).where(eq(invoices.contractId, contractId));
+  const invoiceRows = await db
+    .select({
+      id: invoices.id,
+      invoiceNumber: invoices.invoiceNumber,
+      invoiceDate: invoices.invoiceDate,
+      netAmount: invoices.netAmount,
+      status: invoices.status,
+      requiredRole: approvalRequests.requiredRole,
+    })
+    .from(invoices)
+    .leftJoin(approvalRequests, and(eq(approvalRequests.entityType, "invoice"), eq(approvalRequests.entityId, invoices.id)))
+    .where(eq(invoices.contractId, contractId));
 
   const changeOrderRows = await db
     .select({
@@ -205,7 +216,28 @@ export default async function ContractDetailPage({
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                {inv.status === "submitted" && inv.requiredRole && (
+                  <span className="text-xs text-ink-faint">Requiere: {inv.requiredRole.replace(/_/g, " ")}</span>
+                )}
                 <StatusBadge status={inv.status} />
+                {inv.status === "submitted" && (
+                  <div className="flex items-center gap-2">
+                    <form action={decideInvoice}>
+                      <input type="hidden" name="invoiceId" value={inv.id} />
+                      <input type="hidden" name="decision" value="approved" />
+                      <button className="rounded-lg bg-blueprint px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90">
+                        Aprobar
+                      </button>
+                    </form>
+                    <form action={decideInvoice}>
+                      <input type="hidden" name="invoiceId" value={inv.id} />
+                      <input type="hidden" name="decision" value="rejected" />
+                      <button className="rounded-lg border border-line-strong px-3 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:bg-paper">
+                        Rechazar
+                      </button>
+                    </form>
+                  </div>
+                )}
                 {inv.status === "approved" && (
                   <form action={markInvoicePaid} className="flex items-center gap-2">
                     <input type="hidden" name="invoiceId" value={inv.id} />
@@ -264,8 +296,8 @@ export default async function ContractDetailPage({
           </button>
         </form>
         <p className="mt-2 max-w-lg text-xs text-ink-faint">
-          En esta slice la factura se crea directo en estado "approved" — el enrutamiento por umbral de
-          aprobación (Approval Authorities, §4.7) se construye en una siguiente slice.
+          La factura entra como "submitted" y pasa por Approval Authorities (§4.7: cualquier monto
+          requiere Finance) — "Marcar Paid" solo aparece una vez aprobada.
         </p>
       </main>
     </>

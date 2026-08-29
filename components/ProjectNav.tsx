@@ -3,10 +3,17 @@ import Link from "next/link";
 // Project-level sub-nav (Wireframe B's project nav: Overview/Plan/Costs/
 // Revenue/Capital/Business Plan/...). Only tabs for screens that actually
 // exist in this slice are shown — no dead links to unbuilt modules.
-export function ProjectNav({ projectId, active }: { projectId: string; active: "overview" | "budget" }) {
+export function ProjectNav({
+  projectId,
+  active,
+}: {
+  projectId: string;
+  active: "overview" | "budget" | "contracts";
+}) {
   const tabs = [
     { key: "overview", label: "Overview", href: `/projects/${projectId}` },
     { key: "budget", label: "Control Presupuestal", href: `/projects/${projectId}/budget` },
+    { key: "contracts", label: "Contratos", href: `/projects/${projectId}/contracts` },
   ] as const;
 
   return (
