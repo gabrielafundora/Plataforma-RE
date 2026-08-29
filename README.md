@@ -29,9 +29,11 @@ Primer "vertical slice" del producto descrito en `docs/strategy/`: en vez de con
 ```bash
 npm install
 
-# 1. Base de datos local (o cualquier Postgres — Supabase incluido, es el mismo schema.sql)
-createdb re_os_dev
-cp .env.example .env.local   # ajusta DATABASE_URL si tu Postgres no es el default
+# 1. Base de datos — un proyecto gratis en neon.tech o supabase.com es lo
+#    más simple (Windows incluido: no requiere instalar Postgres ni psql,
+#    db:migrate y db:seed corren en Node puro). Postgres local también
+#    funciona si lo prefieres — es el mismo schema.sql cualquiera de los dos.
+cp .env.example .env.local   # pega tu connection string en DATABASE_URL
 npm run db:migrate           # aplica docs/schema/schema.sql
 npm run db:seed              # crea un org/proyecto/contrato de ejemplo
 

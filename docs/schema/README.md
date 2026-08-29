@@ -44,9 +44,17 @@ La tabla `accruals` existe y se usa para refinar el forecast remanente, pero la 
 
 ## Cómo probarlo
 
+Con `psql` (Mac/Linux, o Windows con Postgres instalado):
+
 ```bash
 createdb re_os_dev
 psql -d re_os_dev -f docs/schema/schema.sql
+```
+
+Sin `psql` — funciona igual contra Postgres local o un proyecto hospedado (Neon/Supabase), y es lo que usa `npm run db:migrate` en la raíz del repo:
+
+```bash
+DATABASE_URL=postgres://... npx tsx lib/db/migrate.ts
 ```
 
 Requiere la extensión `pgcrypto` (se crea automáticamente vía `CREATE EXTENSION IF NOT EXISTS` al inicio del archivo) para `gen_random_uuid()`.
