@@ -415,22 +415,26 @@ Más angosto que el "MVP 1" del Blueprint en los puntos marcados con ⚠️, con
 
 ---
 
-## 8. Decisiones de producto pendientes (decision log)
+## 8. Decisiones de producto (decision log — 12/12 cerradas)
 
-| # | Decisión | Opciones | Recomendación | Por qué es urgente decidirlo ahora |
+Las 12 decisiones que bloqueaban empezar a diseñar o programar ya fueron resueltas por la fundadora. Queda como registro histórico de qué se decidió y por qué, no como lista de pendientes.
+
+| # | Decisión | Opciones | Decisión final | Por qué era urgente decidirlo |
 |---|---|---|---|---|
 | 1 | ¿El MVP incluye un modo "Deal/Underwriting" ligero? | (a) No, arrancar directo en Project Setup completo; (b) Sí, wizard reducido promovible a Project | **✔ Decidido: (b)** — además, el Deal permite mover supuestos y comparar Scenarios antes de aprobar (ver 3.3) | Define el primer momento de valor y si el modelo de `Project` necesita un estado `Draft/Deal` desde el diseño de tablas |
 | 2 | ¿Cuál es el mercado inicial (moneda, fiscalidad)? | México con IVA/retención; EUA con tratamiento fiscal propio; ambos a la vez | **✔ Decidido: USA y México simultáneamente.** `Project.currency` + `Project.market` desde el día 1; `Contract`/`Invoice` con campos genéricos net/tax/retention capturados a mano — ningún motor de cálculo fiscal automático (IVA mexicano o sales tax por estado) en el MVP | Agregar campos de impuestos/moneda después implica migrar todas las tablas financieras; al ser 2 mercados desde el inicio, el modelo no puede asumir un solo régimen fiscal ni una sola moneda |
 | 3 | ¿Cómo entran los "Actuals" en el MVP? | (a) Solo lo capturado nativamente; (b) + import manual Excel/CSV; (c) integración contable real | **✔ Decidido: (b), en cash basis** — Actual = Invoice marcada como Paid, capturada a mano o importada en batch | Sin esto, el Monthly Close no tiene qué "importar" en su paso 1 |
-| 4 | ¿Se soporta más de un asset class en el MVP? | (a) Solo Residential for Sale; (b) Residential + 1 más | **(a)** | Cada motor adicional es meses de trabajo; validar con uno antes de generalizar |
-| 5 | ¿Se soporta multi-fase/mixed-use en la UI del MVP? | (a) No, 1 fase por proyecto; (b) Sí desde V1 | **(a)** | El rollup multi-fase es complejidad no validada aún |
-| 6 | ¿Permisos configurables por el usuario en V1? | (a) Roles fijos predeterminados; (b) Editor de roles/permisos custom | **(a)** | Un editor de permisos es una feature de producto maduro, no de MVP |
-| 7 | ¿Qué funding waterfall se soporta en V1? | (a) Solo Equity First; (b) Configurable desde V1 | **(a)** | Cubre el caso real de la mayoría de desarrolladores pequeños/medianos |
-| 8 | ¿Cuántos reportes estándar entran al MVP? | (a) 4-5 reportes core; (b) Los ~15 del Blueprint | **(a)** | Cada reporte es una superficie de mantenimiento; agregar bajo demanda real |
+| 4 | ¿Se soporta más de un asset class en el MVP? | (a) Solo Residential for Sale; (b) Residential + 1 más | **✔ Decidido: (a)** | Cada motor adicional es meses de trabajo; validar con uno antes de generalizar |
+| 5 | ¿Se soporta multi-fase/mixed-use en la UI del MVP? | (a) No, 1 fase por proyecto; (b) Sí desde V1 | **✔ Decidido: (a)** | El rollup multi-fase es complejidad no validada aún |
+| 6 | ¿Permisos configurables por el usuario en V1? | (a) Roles fijos predeterminados; (b) Editor de roles/permisos custom | **✔ Decidido: (a)** | Un editor de permisos es una feature de producto maduro, no de MVP |
+| 7 | ¿Qué funding waterfall se soporta en V1? | (a) Solo Equity First; (b) Configurable desde V1 | **✔ Decidido: (a)** | Cubre el caso real de la mayoría de desarrolladores pequeños/medianos |
+| 8 | ¿Cuántos reportes estándar entran al MVP? | (a) 4-5 reportes core; (b) Los ~15 del Blueprint | **✔ Decidido: (a)** | Cada reporte es una superficie de mantenimiento; agregar bajo demanda real |
 | 9 | ¿El Business Plan permite capturar assumptions manualmente o solo lee de otros módulos? | (a) Solo lectura derivada; (b) Permite overrides manuales "temporales" | **✔ Decidido: (a), estrictamente** — consistente con que los overrides ("Scenarios") solo existen en el Deal/UW, nunca dentro de Business Plan en ejecución | Permitir overrides manuales reintroduce la duplicación que la tesis central promete eliminar |
-| 10 | ¿Se versiona el linaje de cada assumption desde el día 1? | (a) Sí, aunque no se exponga en UI; (b) Se agrega cuando se construya el Impact Engine | **(a)** | Agregarlo después requiere reconstruir el motor de cálculo, no solo la UI |
-| 11 | ¿Templates de proyecto en V1? | (a) Uno solo (Residential Development), hardcodeado; (b) Sistema de templates configurable | **(a)** | El sistema de templates es prematuro sin 2-3 proyectos reales corriendo |
-| 12 | ¿Portfolio dashboard en V1? | (a) No, solo lista simple de proyectos; (b) Sí, con analytics consolidado | **(a)** | Baja prioridad para un usuario con 1-3 proyectos activos |
+| 10 | ¿Se versiona el linaje de cada assumption desde el día 1? | (a) Sí, aunque no se exponga en UI; (b) Se agrega cuando se construya el Impact Engine | **✔ Decidido: (a)** | Agregarlo después requiere reconstruir el motor de cálculo, no solo la UI |
+| 11 | ¿Templates de proyecto en V1? | (a) Uno solo (Residential Development), hardcodeado; (b) Sistema de templates configurable | **✔ Decidido: (a)** | El sistema de templates es prematuro sin 2-3 proyectos reales corriendo |
+| 12 | ¿Portfolio dashboard en V1? | (a) No, solo lista simple de proyectos; (b) Sí, con analytics consolidado | **✔ Decidido: (a)** | Baja prioridad para un usuario con 1-3 proyectos activos |
+
+**Las 12 decisiones quedan cerradas.** Todas confirman la lectura disciplinada de las secciones 5 y 6 — ningún ajuste adicional al alcance del MVP a partir de este cierre.
 
 ---
 
@@ -450,9 +454,8 @@ Más angosto que el "MVP 1" del Blueprint en los puntos marcados con ⚠️, con
 
 - **Validar con 2-3 desarrolladores reales** el flujo de Deal/Underwriting ligero y el Monthly Close antes de invertir en wireframes de alta fidelidad — son los dos workflows con más incertidumbre de producto (a diferencia de Budget/Contracts, cuya forma ya está bien entendida en la industria).
 - **Prototipar primero el Cost Forecast + Cash Flow Engine** (sección 4.2-4.3), no las pantallas. Es el riesgo técnico más alto del producto: si el motor de recálculo automático no es rápido y confiable, ninguna pantalla lo compensa.
-- **Confirmar el mercado inicial** (decisión #2) antes de diseñar `Contract`/`Invoice` — afecta el modelo de datos financiero de forma transversal.
-- **Fijar el corte de reportes** (decisión #8) con el primer cliente de diseño, no en abstracto — los 15 reportes del Blueprint son una buena lista de *backlog*, no una lista de *V1*.
-- **Siguiente nivel de detalle recomendado** (coincide con el cierre del propio Blueprint): convertir las 20 pantallas de la sección 7.1 en wireframes, especificando por pantalla KPIs, campos, acciones, permisos y relaciones de datos — pero solo después de resolver las 12 decisiones de la sección 8, para no tener que rehacer wireframes cuando cambien.
+- **Las 12 decisiones de la sección 8 ya están cerradas** — el bloqueador para pasar a wireframes y schema real ya no es de producto, es de secuencia de trabajo (ver siguiente punto).
+- **Siguiente nivel de detalle recomendado** (coincide con el cierre del propio Blueprint): convertir las 20 pantallas de la sección 7.1 en wireframes, especificando por pantalla KPIs, campos, acciones, permisos y relaciones de datos; en paralelo, convertir el ERD conceptual de la sección 3.1 en un schema real de base de datos. Ambos ya pueden arrancar sin riesgo de rehacer trabajo por un cambio de scope.
 
 ---
 
