@@ -151,6 +151,7 @@ create table projects (
   spv_entity_name text,                     -- "SPV / ownership entity"
   approved_at     timestamptz,              -- momento de promoción Deal -> Project
   template_id     text not null default 'residential_development', -- decisión 8·11: único, hardcodeado
+  forecast_months integer not null default 24, -- horizonte del Cost Forecast (§4.2) — sin módulo de Schedule, es la única señal de "cuánto dura el proyecto"; approved_at es el mes de arranque
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );

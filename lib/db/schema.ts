@@ -120,6 +120,7 @@ export const projects = pgTable("projects", {
   spvEntityName: text("spv_entity_name"),
   approvedAt: timestamp("approved_at", { withTimezone: true }),
   templateId: text("template_id").notNull().default("residential_development"),
+  forecastMonths: integer("forecast_months").notNull().default(24),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

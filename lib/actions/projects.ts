@@ -96,6 +96,7 @@ const updateProjectDetailsSchema = z.object({
   currency: z.enum(["USD", "MXN"]),
   market: z.enum(["US", "MX"]),
   location: z.string().optional(),
+  forecastMonths: z.coerce.number().int().positive(),
 });
 
 export async function updateProjectDetails(formData: FormData) {
@@ -106,6 +107,7 @@ export async function updateProjectDetails(formData: FormData) {
     currency: formData.get("currency"),
     market: formData.get("market"),
     location: formData.get("location") || undefined,
+    forecastMonths: formData.get("forecastMonths"),
   });
 
   await db
@@ -116,6 +118,7 @@ export async function updateProjectDetails(formData: FormData) {
       currency: parsed.currency,
       market: parsed.market,
       location: parsed.location,
+      forecastMonths: parsed.forecastMonths,
       updatedAt: new Date(),
     })
     .where(eq(projects.id, parsed.projectId));

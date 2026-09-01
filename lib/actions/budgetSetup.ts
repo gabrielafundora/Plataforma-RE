@@ -132,7 +132,13 @@ export async function addCostCode(formData: FormData) {
 // audit_log table wired into Drizzle yet, so — same disclosed
 // limitation as the rest of this slice — the reason isn't persisted
 // anywhere; it's a confirmation step, not an audit trail.
+//
+// Same table also carries `method_<id>` — the curve method Cost
+// Forecast uses for that partida (lib/forecast/engine.ts). Only the 4
+// curve methods the engine actually implements are offered; the other
+// 4 enum values depend on a Schedule module that doesn't exist yet.
 const amountFieldSchema = z.coerce.number().min(0);
+const methodFieldSchema = z.enum(["straight_line", "s_curve", "front_loaded", "back_loaded"]);
 
 export async function saveBudgetBaseline(formData: FormData) {
   const projectId = z.string().uuid().parse(formData.get("projectId"));
@@ -144,15 +150,25 @@ export async function saveBudgetBaseline(formData: FormData) {
     .where(eq(budgetLines.phaseId, phase.id));
   const validIds = new Set(leafLines.map((l) => l.id));
 
+  const updates = new Map<string, { originalAmount?: string; forecastMethod?: z.infer<typeof methodFieldSchema> }>();
   for (const [key, value] of formData.entries()) {
-    if (!key.startsWith("amount_")) continue;
-    const budgetLineId = key.slice("amount_".length);
-    if (!validIds.has(budgetLineId)) continue;
+    if (key.startsWith("amount_")) {
+      const budgetLineId = key.slice("amount_".length);
+      if (!validIds.has(budgetLineId)) continue;
+      const amount = amountFieldSchema.parse(value);
+      updates.set(budgetLineId, { ...updates.get(budgetLineId), originalAmount: String(amount) });
+    } else if (key.startsWith("method_")) {
+      const budgetLineId = key.slice("method_".length);
+      if (!validIds.has(budgetLineId)) continue;
+      const method = methodFieldSchema.parse(value);
+      updates.set(budgetLineId, { ...updates.get(budgetLineId), forecastMethod: method });
+    }
+  }
 
-    const amount = amountFieldSchema.parse(value);
+  for (const [budgetLineId, values] of updates) {
     await db
       .update(budgetLines)
-      .set({ originalAmount: String(amount), updatedAt: new Date() })
+      .set({ ...values, updatedAt: new Date() })
       .where(eq(budgetLines.id, budgetLineId));
   }
 

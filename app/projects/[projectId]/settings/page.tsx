@@ -101,6 +101,21 @@ export default async function ProjectSettingsPage({
             />
           </Field>
 
+          <Field label="Duración del forecast (meses)">
+            <input
+              type="number"
+              name="forecastMonths"
+              required
+              min={1}
+              defaultValue={project.forecastMonths}
+              className="w-32 rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-ink"
+            />
+          </Field>
+          <p className="-mt-2 max-w-md text-xs text-ink-faint">
+            Sin módulo de Schedule todavía, esto define el horizonte del tab Forecast — arranca el mes en
+            que se aprobó el proyecto.
+          </p>
+
           <button className="mt-2 self-start rounded-lg bg-blueprint px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90">
             Guardar cambios
           </button>
