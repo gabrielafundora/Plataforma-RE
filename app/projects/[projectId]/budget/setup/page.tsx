@@ -17,14 +17,6 @@ import { saveBudgetBaseline } from "@/lib/actions/budgetSetup";
 // Budget Line Detail, ahora centralizado aquí.
 export const dynamic = "force-dynamic";
 
-const CURVE_METHODS = ["straight_line", "s_curve", "front_loaded", "back_loaded"] as const;
-const CURVE_METHOD_LABELS: Record<(typeof CURVE_METHODS)[number], string> = {
-  straight_line: "Línea recta",
-  s_curve: "S-Curve",
-  front_loaded: "Front-loaded",
-  back_loaded: "Back-loaded",
-};
-
 interface Row {
   budgetLineId: string;
   costCodeId: string;
@@ -32,7 +24,6 @@ interface Row {
   description: string;
   parentCostCodeId: string | null;
   original: number;
-  forecastMethod: string;
 }
 
 interface Group {
@@ -56,7 +47,6 @@ export default async function BudgetSetupPage({ params }: { params: Promise<{ pr
         description: costCodes.description,
         parentCostCodeId: costCodes.parentCostCodeId,
         original: budgetLines.originalAmount,
-        forecastMethod: budgetLines.forecastMethod,
       })
       .from(budgetLines)
       .innerJoin(costCodes, eq(costCodes.id, budgetLines.costCodeId))
@@ -150,13 +140,12 @@ export default async function BudgetSetupPage({ params }: { params: Promise<{ pr
           )}
 
           <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
-            <table className="w-full min-w-[760px] text-sm">
+            <table className="w-full min-w-[560px] text-sm">
               <thead className="border-b border-line bg-surface-2 text-xs font-medium text-ink-soft">
                 <tr>
                   <th className="px-4 py-3 text-left">Code</th>
                   <th className="px-4 py-3 text-left">Description</th>
                   <th className="px-4 py-3 text-right">Presupuesto</th>
-                  <th className="px-4 py-3 text-left">Método de curva</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -180,21 +169,6 @@ export default async function BudgetSetupPage({ params }: { params: Promise<{ pr
                             />
                           )}
                         </td>
-                        <td className="px-4 py-3">
-                          {!isParent && (
-                            <select
-                              name={`method_${g.ownRow!.budgetLineId}`}
-                              defaultValue={g.ownRow!.forecastMethod}
-                              className="w-40 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink"
-                            >
-                              {CURVE_METHODS.map((m) => (
-                                <option key={m} value={m}>
-                                  {CURVE_METHOD_LABELS[m]}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </td>
                       </tr>
                       {g.children.map((c) => (
                         <tr key={c.budgetLineId}>
@@ -208,19 +182,6 @@ export default async function BudgetSetupPage({ params }: { params: Promise<{ pr
                               defaultValue={c.original}
                               className="w-40 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-right text-sm text-ink"
                             />
-                          </td>
-                          <td className="px-4 py-3">
-                            <select
-                              name={`method_${c.budgetLineId}`}
-                              defaultValue={c.forecastMethod}
-                              className="w-40 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink"
-                            >
-                              {CURVE_METHODS.map((m) => (
-                                <option key={m} value={m}>
-                                  {CURVE_METHOD_LABELS[m]}
-                                </option>
-                              ))}
-                            </select>
                           </td>
                         </tr>
                       ))}
