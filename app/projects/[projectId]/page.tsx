@@ -1,16 +1,27 @@
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { budgetLines, phases, projects, budgetLineRollup } from "@/lib/db/schema";
+import {
+  budgetLines,
+  phases,
+  projects,
+  budgetLineRollup,
+  units,
+  sales,
+  collections,
+  debtFacilities,
+  debtFacilityRollup,
+  equityInvestorRollup,
+} from "@/lib/db/schema";
 import { formatMoney } from "@/lib/format";
 import { AppHeader } from "@/components/AppHeader";
 import { ProjectNav } from "@/components/ProjectNav";
 import { StatusBadge } from "@/components/StatusBadge";
 
 // Pantalla 2 — Project Dashboard (Wireframe B). Responde en segundos
-// "¿cómo va el proyecto?" — pero solo para lo que esta slice realmente
-// construyó (Costs). Los demás módulos se muestran, sin inventar datos,
-// como "todavía no construido" en vez de omitirlos silenciosamente.
+// "¿cómo va el proyecto?" — para cada módulo que esta app ya construyó
+// (Costs, Revenue, Capital). Schedule sigue sin construirse, y se
+// muestra como tal en vez de inventar datos u omitirlo en silencio.
 export const dynamic = "force-dynamic";
 
 export default async function ProjectDashboardPage({
@@ -41,6 +52,52 @@ export default async function ProjectDashboardPage({
   const variance = current - forecastFinal;
   const pctCommitted = current > 0 ? Math.round((committed / current) * 100) : 0;
   const pctPaid = current > 0 ? Math.round((actual / current) * 100) : 0;
+
+  // Revenue — % sold, Contracted, Collections (§7.1, pantalla 2).
+  const unitRows = await db
+    .select({ status: units.status })
+    .from(units)
+    .innerJoin(phases, eq(phases.id, units.phaseId))
+    .where(eq(phases.projectId, projectId));
+  const totalUnits = unitRows.length;
+  const soldUnits = unitRows.filter((u) => u.status === "sold").length;
+  const pctSold = totalUnits > 0 ? Math.round((soldUnits / totalUnits) * 100) : 0;
+
+  const salesRows = await db
+    .select({ priceTotal: sales.priceTotal })
+    .from(sales)
+    .innerJoin(units, eq(units.id, sales.unitId))
+    .innerJoin(phases, eq(phases.id, units.phaseId))
+    .where(eq(phases.projectId, projectId));
+  const contracted = salesRows.reduce((s, r) => s + Number(r.priceTotal), 0);
+
+  const collectionRows = await db
+    .select({ amount: collections.amount, status: collections.status })
+    .from(collections)
+    .innerJoin(sales, eq(sales.id, collections.saleId))
+    .innerJoin(units, eq(units.id, sales.unitId))
+    .innerJoin(phases, eq(phases.id, units.phaseId))
+    .where(eq(phases.projectId, projectId));
+  const collected = collectionRows.filter((c) => c.status === "paid").reduce((s, c) => s + Number(c.amount), 0);
+
+  // Capital — Equity invested, Debt drawn, Debt available, Remaining
+  // equity need (§7.1, pantalla 2).
+  const [facility] = await db.select().from(debtFacilities).where(eq(debtFacilities.projectId, projectId));
+  const [facilityRollupRow] = facility
+    ? await db.select().from(debtFacilityRollup).where(eq(debtFacilityRollup.debtFacilityId, facility.id))
+    : [undefined];
+  const debtDrawn = Number(facilityRollupRow?.fundedAmount ?? 0);
+  const debtAvailable = Number(facilityRollupRow?.availableToDraw ?? facility?.loanAmount ?? 0);
+
+  const investorRollupRows = await db
+    .select()
+    .from(equityInvestorRollup)
+    .where(eq(equityInvestorRollup.projectId, projectId));
+  const equityInvested = investorRollupRows.reduce((s, r) => s + Number(r.contributedAmount ?? 0), 0);
+  const remainingEquityNeed = investorRollupRows.reduce(
+    (s, r) => s + Number(r.remainingCommitment ?? r.commitmentAmount ?? 0),
+    0
+  );
 
   if (!project) {
     return (
@@ -84,8 +141,27 @@ export default async function ProjectDashboardPage({
             }
           />
           <ModulePanel title="Schedule" rows={[]} />
-          <ModulePanel title="Revenue" rows={[]} />
-          <ModulePanel title="Capital" rows={[]} />
+          <ModulePanel
+            title="Revenue"
+            live
+            href={`/projects/${projectId}/inventory`}
+            rows={[
+              ["% sold", `${pctSold}% (${soldUnits}/${totalUnits})`],
+              ["Contracted", formatMoney(contracted)],
+              ["Collections", formatMoney(collected)],
+            ]}
+          />
+          <ModulePanel
+            title="Capital"
+            live
+            href={`/projects/${projectId}/debt`}
+            rows={[
+              ["Equity invested", formatMoney(equityInvested)],
+              ["Debt drawn", formatMoney(debtDrawn)],
+              ["Debt available", formatMoney(debtAvailable)],
+              ["Remaining equity need", formatMoney(remainingEquityNeed)],
+            ]}
+          />
         </div>
       </main>
     </>
