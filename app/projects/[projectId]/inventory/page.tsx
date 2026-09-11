@@ -15,8 +15,32 @@ import { createUnit, updateUnitPrice } from "@/lib/actions/revenue";
 // campos del plan de pagos, mismo criterio que budget/setup).
 export const dynamic = "force-dynamic";
 
-export default async function ProjectInventoryPage({ params }: { params: Promise<{ projectId: string }> }) {
+// Sugiere el siguiente código disponible a partir de uno existente
+// ("A101" -> "A102", saltándose los que ya existen) — solo una
+// sugerencia editable, nunca se fuerza: si no hay sufijo numérico que
+// incrementar, el campo simplemente queda vacío para que se teclee a mano.
+function suggestNextCode(sourceCode: string, existingCodes: Set<string>): string {
+  const match = sourceCode.match(/^(.*?)(\d+)$/);
+  if (!match) return "";
+  const [, prefix, digits] = match;
+  let n = parseInt(digits, 10);
+  let candidate: string;
+  do {
+    n += 1;
+    candidate = `${prefix}${String(n).padStart(digits.length, "0")}`;
+  } while (existingCodes.has(candidate));
+  return candidate;
+}
+
+export default async function ProjectInventoryPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ duplicate?: string }>;
+}) {
   const { projectId } = await params;
+  const { duplicate } = await searchParams;
 
   const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
 
@@ -46,6 +70,9 @@ export default async function ProjectInventoryPage({ params }: { params: Promise
   ).map((u) => ({ ...u, areaM2: Number(u.areaM2), pricePerM2: Number(u.pricePerM2) }));
 
   const soldCount = rows.filter((u) => u.status === "sold").length;
+
+  const sourceUnit = duplicate ? rows.find((u) => u.id === duplicate) : undefined;
+  const suggestedCode = sourceUnit ? suggestNextCode(sourceUnit.code, new Set(rows.map((r) => r.code))) : "";
 
   return (
     <>
@@ -103,14 +130,22 @@ export default async function ProjectInventoryPage({ params }: { params: Promise
                     <StatusBadge status={u.status} />
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {u.status === "available" && (
+                    <div className="flex items-center justify-end gap-3">
+                      {u.status === "available" && (
+                        <Link
+                          href={`/projects/${projectId}/inventory/${u.id}/sell`}
+                          className="text-xs font-medium text-blueprint hover:underline"
+                        >
+                          Registrar venta
+                        </Link>
+                      )}
                       <Link
-                        href={`/projects/${projectId}/inventory/${u.id}/sell`}
-                        className="text-xs font-medium text-blueprint hover:underline"
+                        href={`/projects/${projectId}/inventory?duplicate=${u.id}#nueva-unidad`}
+                        className="text-xs font-medium text-ink-soft hover:underline"
                       >
-                        Registrar venta
+                        Duplicar
                       </Link>
-                    )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -125,23 +160,62 @@ export default async function ProjectInventoryPage({ params }: { params: Promise
           </table>
         </div>
 
-        <h2 className="mt-10 text-sm font-medium text-ink-soft">+ Nueva unidad</h2>
+        <h2 id="nueva-unidad" className="mt-10 text-sm font-medium text-ink-soft">
+          + Nueva unidad
+        </h2>
+        {sourceUnit && (
+          <p className="mt-1 text-xs text-ink-faint">
+            Copiando tipo/m²/precio de <strong className="text-ink">{sourceUnit.code}</strong> — solo
+            falta confirmar el código.{" "}
+            <Link href={`/projects/${projectId}/inventory`} className="text-blueprint hover:underline">
+              Cancelar
+            </Link>
+          </p>
+        )}
         <form
+          key={sourceUnit?.id ?? "blank"}
           action={createUnit}
           className="mt-3 flex flex-wrap items-end gap-4 rounded-xl border border-line bg-surface p-5 shadow-sm"
         >
           <input type="hidden" name="projectId" value={projectId} />
           <Field label="Unidad">
-            <input name="code" required placeholder="A101" className="w-28 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink" />
+            <input
+              name="code"
+              required
+              placeholder="A101"
+              defaultValue={suggestedCode}
+              autoFocus={!!sourceUnit}
+              className="w-28 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink"
+            />
           </Field>
           <Field label="Tipo">
-            <input name="unitType" required placeholder="2BR" className="w-24 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink" />
+            <input
+              name="unitType"
+              required
+              placeholder="2BR"
+              defaultValue={sourceUnit?.unitType}
+              className="w-24 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink"
+            />
           </Field>
           <Field label="m²">
-            <input type="number" name="areaM2" required step="0.01" className="w-24 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink" />
+            <input
+              type="number"
+              name="areaM2"
+              required
+              step="0.01"
+              defaultValue={sourceUnit?.areaM2}
+              className="w-24 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink"
+            />
           </Field>
           <Field label="Precio/m²">
-            <input type="number" name="pricePerM2" required step="0.01" className="w-32 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink" />
+            <input
+              type="number"
+              name="pricePerM2"
+              required
+              step="0.01"
+              defaultValue={sourceUnit?.pricePerM2}
+              className="w-32 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink"
+            />
           </Field>
           <button className="rounded-lg bg-blueprint px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90">
             Crear unidad
