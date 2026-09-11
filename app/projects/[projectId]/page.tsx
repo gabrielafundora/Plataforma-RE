@@ -12,16 +12,18 @@ import {
   debtFacilities,
   debtFacilityRollup,
   equityInvestorRollup,
+  tasks,
+  milestones,
 } from "@/lib/db/schema";
 import { formatMoney } from "@/lib/format";
 import { AppHeader } from "@/components/AppHeader";
 import { ProjectNav } from "@/components/ProjectNav";
 import { StatusBadge } from "@/components/StatusBadge";
+import { computeCriticalPath } from "@/lib/schedule/criticalPath";
 
 // Pantalla 2 — Project Dashboard (Wireframe B). Responde en segundos
 // "¿cómo va el proyecto?" — para cada módulo que esta app ya construyó
-// (Costs, Revenue, Capital). Schedule sigue sin construirse, y se
-// muestra como tal en vez de inventar datos u omitirlo en silencio.
+// (Costs, Schedule, Revenue, Capital).
 export const dynamic = "force-dynamic";
 
 export default async function ProjectDashboardPage({
@@ -99,6 +101,40 @@ export default async function ProjectDashboardPage({
     0
   );
 
+  // Schedule — % complete, completion date, critical path, milestones
+  // (§7.1, pantalla 2) — mismo cálculo que /schedule.
+  const taskRows = await db
+    .select({
+      id: tasks.id,
+      endDate: tasks.endDate,
+      predecessorTaskId: tasks.predecessorTaskId,
+      progressPct: tasks.progressPct,
+    })
+    .from(tasks)
+    .innerJoin(phases, eq(phases.id, tasks.phaseId))
+    .where(eq(phases.projectId, projectId));
+  const totalTasks = taskRows.length;
+  const pctComplete =
+    totalTasks > 0
+      ? Math.round(taskRows.reduce((s, t) => s + Number(t.progressPct), 0) / totalTasks)
+      : 0;
+  const completionDate = taskRows.reduce<string | null>(
+    (latest, t) => (latest === null || t.endDate > latest ? t.endDate : latest),
+    null
+  );
+  const criticalPath = computeCriticalPath(
+    taskRows.map((t) => ({ id: t.id, endDate: t.endDate, predecessorTaskId: t.predecessorTaskId }))
+  );
+
+  const milestoneRows = await db
+    .select({ targetDate: milestones.targetDate })
+    .from(milestones)
+    .innerJoin(phases, eq(phases.id, milestones.phaseId))
+    .where(eq(phases.projectId, projectId));
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const totalMilestones = milestoneRows.length;
+  const overdueMilestones = milestoneRows.filter((m) => m.targetDate < todayStr).length;
+
   if (!project) {
     return (
       <>
@@ -140,7 +176,20 @@ export default async function ProjectDashboardPage({
               </span>
             }
           />
-          <ModulePanel title="Schedule" rows={[]} />
+          <ModulePanel
+            title="Schedule"
+            live
+            href={`/projects/${projectId}/schedule`}
+            rows={[
+              ["% complete", `${pctComplete}%`],
+              ["Completion date", completionDate ?? "—"],
+              ["Ruta crítica", `${criticalPath.size} tarea${criticalPath.size === 1 ? "" : "s"}`],
+              [
+                "Milestones",
+                `${totalMilestones}${overdueMilestones > 0 ? ` · ${overdueMilestones} vencido${overdueMilestones === 1 ? "" : "s"}` : ""}`,
+              ],
+            ]}
+          />
           <ModulePanel
             title="Revenue"
             live

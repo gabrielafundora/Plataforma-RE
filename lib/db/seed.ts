@@ -23,6 +23,8 @@ import {
   debtDraws,
   equityInvestors,
   equityContributions,
+  tasks,
+  milestones,
 } from "./schema";
 import { RESIDENTIAL_FOR_SALE_CATALOG, isLeaf } from "../costCodes/defaultCatalog";
 import { buildPaymentPlan, expandPaymentPlan } from "../revenue/paymentPlan";
@@ -254,6 +256,74 @@ async function main() {
     amount: "20000000",
   });
 
+  // Plan — schedule, tareas, milestones (§3, §7.1 pantalla 5). Una
+  // cadena principal (permisos → cimentación → estructura → acabados)
+  // más una rama corta (instalaciones) que no es la ruta crítica —
+  // para que /schedule tenga tanto una ruta crítica real como una
+  // tarea "atrasada" (estructura al 60%, con fecha fin ya en el
+  // pasado) y un milestone vencido desde el primer día.
+  const [t1] = await db
+    .insert(tasks)
+    .values({
+      phaseId: phase.id,
+      name: "Permisos y licencias",
+      startDate: "2026-01-01",
+      endDate: "2026-01-31",
+      progressPct: "100",
+      ownerUserId: user.id,
+    })
+    .returning();
+
+  const [t2] = await db
+    .insert(tasks)
+    .values({
+      phaseId: phase.id,
+      name: "Cimentación",
+      startDate: "2026-02-01",
+      endDate: "2026-03-15",
+      progressPct: "100",
+      predecessorTaskId: t1.id,
+      ownerUserId: user.id,
+    })
+    .returning();
+
+  const [t3] = await db
+    .insert(tasks)
+    .values({
+      phaseId: phase.id,
+      name: "Estructura",
+      startDate: "2026-03-16",
+      endDate: "2026-07-31",
+      progressPct: "60",
+      predecessorTaskId: t2.id,
+      ownerUserId: user.id,
+    })
+    .returning();
+
+  const [t4] = await db.insert(tasks).values({
+    phaseId: phase.id,
+    name: "Acabados",
+    startDate: "2026-08-01",
+    endDate: "2026-11-30",
+    progressPct: "0",
+    predecessorTaskId: t3.id,
+  }).returning();
+
+  await db.insert(tasks).values({
+    phaseId: phase.id,
+    name: "Instalaciones eléctricas",
+    startDate: "2026-03-16",
+    endDate: "2026-05-31",
+    progressPct: "40",
+    predecessorTaskId: t2.id,
+  });
+
+  await db.insert(milestones).values([
+    { phaseId: phase.id, taskId: t2.id, name: "Inicio de obra", targetDate: "2026-02-01", isCritical: true },
+    { phaseId: phase.id, taskId: t3.id, name: "Entrega estructura", targetDate: "2026-07-31", isCritical: true },
+    { phaseId: phase.id, taskId: t4.id, name: "Entrega final", targetDate: "2026-11-30", isCritical: true },
+  ]);
+
   console.log("Seeded:", {
     organizationId: org.id,
     userId: user.id,
@@ -263,6 +333,7 @@ async function main() {
     saleId: sale.id,
   });
   console.log(`\nOpen: http://localhost:3000/projects/${project.id}/budget`);
+  console.log(`      http://localhost:3000/projects/${project.id}/schedule`);
   console.log(`      http://localhost:3000/projects/${project.id}/inventory`);
   console.log(`      http://localhost:3000/projects/${project.id}/collections`);
   console.log(`      http://localhost:3000/projects/${project.id}/debt`);

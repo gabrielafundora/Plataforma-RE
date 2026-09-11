@@ -20,6 +20,7 @@ export function ProjectNav({
   projectId: string;
   active:
     | "overview"
+    | "schedule"
     | "budget"
     | "forecast"
     | "contracts"
@@ -34,6 +35,7 @@ export function ProjectNav({
 }) {
   const tabs = [
     { key: "overview", label: "Overview", href: `/projects/${projectId}` },
+    { key: "schedule", label: "Schedule", href: `/projects/${projectId}/schedule` },
     { key: "budget", label: "Control Presupuestal", href: `/projects/${projectId}/budget` },
     { key: "forecast", label: "Forecast", href: `/projects/${projectId}/forecast` },
     { key: "contracts", label: "Contratos", href: `/projects/${projectId}/contracts` },

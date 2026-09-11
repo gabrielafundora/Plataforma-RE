@@ -3,9 +3,9 @@
 // docs/schema/schema.sql is the source of truth for the actual database
 // structure (it's what you run to create/migrate the DB). This file is
 // a typed query layer on top of that — only the tables/views the slices
-// built so far (Costs + Cash Flow Engine, Revenue/For Sale, Capital)
-// actually touch are mapped here. Extend it domain by domain as later
-// slices (Plan, Business Plan, Platform Core) get built.
+// built so far (Costs + Cash Flow Engine, Revenue/For Sale, Capital,
+// Plan/Schedule, Business Plan) actually touch are mapped here. Extend
+// it domain by domain as later slices (Platform Core) get built.
 import {
   pgTable,
   pgView,
@@ -137,6 +137,32 @@ export const phases = pgTable("phases", {
   name: text("name").notNull(),
   assetClass: text("asset_class").notNull(),
   sequenceOrder: integer("sequence_order").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// --- Plan — schedule, tareas, milestones (§3, decisión 8·05: 1 sola fase) ---
+
+export const tasks = pgTable("tasks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  phaseId: uuid("phase_id").notNull(),
+  name: text("name").notNull(),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  progressPct: numeric("progress_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  predecessorTaskId: uuid("predecessor_task_id"),
+  lagDays: integer("lag_days").notNull().default(0),
+  ownerUserId: uuid("owner_user_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const milestones = pgTable("milestones", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  phaseId: uuid("phase_id").notNull(),
+  taskId: uuid("task_id"),
+  name: text("name").notNull(),
+  targetDate: date("target_date").notNull(),
+  isCritical: boolean("is_critical").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
