@@ -18,6 +18,8 @@ export function ProjectNav({
     | "collections"
     | "debt"
     | "equity"
+    | "cashflow"
+    | "returns"
     | "settings";
 }) {
   const tabs = [
@@ -30,6 +32,8 @@ export function ProjectNav({
     { key: "collections", label: "Cobranza", href: `/projects/${projectId}/collections` },
     { key: "debt", label: "Deuda", href: `/projects/${projectId}/debt` },
     { key: "equity", label: "Equity", href: `/projects/${projectId}/equity` },
+    { key: "cashflow", label: "Cash Flow", href: `/projects/${projectId}/cashflow` },
+    { key: "returns", label: "Returns", href: `/projects/${projectId}/returns` },
     { key: "settings", label: "Configuración", href: `/projects/${projectId}/settings` },
   ] as const;
 
