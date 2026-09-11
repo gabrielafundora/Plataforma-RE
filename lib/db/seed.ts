@@ -19,6 +19,10 @@ import {
   units,
   sales,
   collections,
+  debtFacilities,
+  debtDraws,
+  equityInvestors,
+  equityContributions,
 } from "./schema";
 import { RESIDENTIAL_FOR_SALE_CATALOG, isLeaf } from "../costCodes/defaultCatalog";
 import { buildPaymentPlan, expandPaymentPlan } from "../revenue/paymentPlan";
@@ -199,6 +203,57 @@ async function main() {
 
   await db.update(units).set({ status: "sold" }).where(eq(units.id, soldUnitId));
 
+  // Capital — equity y deuda (§6, solo Equity First). Un sponsor propio
+  // ya aportó parte de su compromiso, y un crédito de construcción con
+  // un draw ya fondeado — para que /debt y /equity tengan de dónde
+  // calcular el panel de "próximo mes" desde el primer día.
+  const [lender] = await db
+    .insert(counterparties)
+    .values({ organizationId: org.id, name: "Banco del Norte", type: "lender" })
+    .returning();
+
+  const [facility] = await db
+    .insert(debtFacilities)
+    .values({
+      projectId: project.id,
+      lenderId: lender.id,
+      loanAmount: "200000000",
+      ltc: "0.65",
+      ltv: "0.55",
+      referenceRate: "TIIE",
+      spreadBps: 350,
+      termMonths: 36,
+      amortizationMonths: 24,
+      interestReserve: "5000000",
+      commitmentFeePct: "0.01",
+    })
+    .returning();
+
+  await db.insert(debtDraws).values({
+    debtFacilityId: facility.id,
+    periodMonth: "2026-02-01",
+    requestedAmount: "30000000",
+    fundedAmount: "30000000",
+    status: "funded",
+    fundedDate: "2026-02-10",
+  });
+
+  const [sponsor] = await db
+    .insert(equityInvestors)
+    .values({
+      projectId: project.id,
+      counterpartyId: null,
+      name: "Sponsor Developer XYZ",
+      commitmentAmount: "80000000",
+    })
+    .returning();
+
+  await db.insert(equityContributions).values({
+    equityInvestorId: sponsor.id,
+    periodMonth: "2026-01-15",
+    amount: "20000000",
+  });
+
   console.log("Seeded:", {
     organizationId: org.id,
     userId: user.id,
@@ -210,6 +265,8 @@ async function main() {
   console.log(`\nOpen: http://localhost:3000/projects/${project.id}/budget`);
   console.log(`      http://localhost:3000/projects/${project.id}/inventory`);
   console.log(`      http://localhost:3000/projects/${project.id}/collections`);
+  console.log(`      http://localhost:3000/projects/${project.id}/debt`);
+  console.log(`      http://localhost:3000/projects/${project.id}/equity`);
 
   process.exit(0);
 }

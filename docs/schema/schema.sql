@@ -453,7 +453,8 @@ create table debt_facilities (
   amortization_months int,
   interest_reserve  numeric(18,2) default 0,
   commitment_fee_pct numeric(9,6) default 0,
-  created_at        timestamptz not null default now()
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
 );
 create index on debt_facilities(project_id);
 
@@ -474,7 +475,8 @@ create table debt_draws (
   funded_amount     numeric(18,2),
   status            debt_draw_status not null default 'requested',
   funded_date       date,
-  created_at        timestamptz not null default now()
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
 );
 create index on debt_draws(debt_facility_id, period_month);
 comment on table debt_draws is
@@ -762,6 +764,53 @@ comment on view sale_collection_rollup is
   'Collections (§1.1). overdue_amount depende de collections.status, que '
   'nadie transiciona automáticamente todavía: hoy siempre es 0 salvo que '
   'se marque a mano.';
+
+-- Rollup de Debt Facility: saldo dispuesto neto de capital pagado, y lo
+-- que queda disponible para disponer. El interés NO se deriva aquí —
+-- reference_rate es texto ("TIIE", "SOFR"), no hay feed de tasa vigente
+-- en el MVP, así que interest_amount se captura a mano en debt_payments
+-- (mismo espíritu que covenants: "captura manual, sin alertas
+-- automáticas", §5).
+create or replace view debt_facility_rollup as
+select
+  f.id as debt_facility_id,
+  f.loan_amount,
+  coalesce(draws.funded, 0) as funded_amount,
+  coalesce(pay.principal_paid, 0) as principal_paid,
+  coalesce(draws.funded, 0) - coalesce(pay.principal_paid, 0) as outstanding_balance,
+  f.loan_amount - (coalesce(draws.funded, 0) - coalesce(pay.principal_paid, 0)) as available_to_draw
+from debt_facilities f
+left join (
+  select debt_facility_id, sum(funded_amount) as funded
+  from debt_draws where status = 'funded'
+  group by debt_facility_id
+) draws on draws.debt_facility_id = f.id
+left join (
+  select debt_facility_id, sum(principal_amount) as principal_paid
+  from debt_payments
+  group by debt_facility_id
+) pay on pay.debt_facility_id = f.id;
+
+-- Rollup de Equity Investor: aportado/distribuido a la fecha vs.
+-- compromiso — lo que el motor Equity First (lib/capital/equityFirst.ts)
+-- necesita para saber cuánto equity sigue disponible por llamar.
+create or replace view equity_investor_rollup as
+select
+  ei.id as equity_investor_id,
+  ei.project_id,
+  ei.commitment_amount,
+  coalesce(c.contributed, 0) as contributed_amount,
+  coalesce(d.distributed, 0) as distributed_amount,
+  ei.commitment_amount - coalesce(c.contributed, 0) as remaining_commitment
+from equity_investors ei
+left join (
+  select equity_investor_id, sum(amount) as contributed
+  from equity_contributions group by equity_investor_id
+) c on c.equity_investor_id = ei.id
+left join (
+  select equity_investor_id, sum(amount) as distributed
+  from distributions group by equity_investor_id
+) d on d.equity_investor_id = ei.id;
 
 -- =====================================================================
 -- 10. SEED DATA — reglas de aprobación fijas (Approval Authorities, §4.7)

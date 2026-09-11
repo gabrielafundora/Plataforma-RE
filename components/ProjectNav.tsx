@@ -16,6 +16,8 @@ export function ProjectNav({
     | "invoices"
     | "inventory"
     | "collections"
+    | "debt"
+    | "equity"
     | "settings";
 }) {
   const tabs = [
@@ -26,6 +28,8 @@ export function ProjectNav({
     { key: "invoices", label: "Facturas", href: `/projects/${projectId}/invoices` },
     { key: "inventory", label: "Inventario", href: `/projects/${projectId}/inventory` },
     { key: "collections", label: "Cobranza", href: `/projects/${projectId}/collections` },
+    { key: "debt", label: "Deuda", href: `/projects/${projectId}/debt` },
+    { key: "equity", label: "Equity", href: `/projects/${projectId}/equity` },
     { key: "settings", label: "Configuración", href: `/projects/${projectId}/settings` },
   ] as const;
 

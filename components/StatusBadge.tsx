@@ -23,6 +23,9 @@ const STYLES: Record<string, string> = {
   sold: "bg-success-soft text-success",
   pending: "bg-warning-soft text-warning",
   overdue: "bg-redline-soft text-redline",
+
+  requested: "bg-surface-2 text-ink-soft",
+  funded: "bg-success-soft text-success",
 };
 
 const LABELS: Record<string, string> = {

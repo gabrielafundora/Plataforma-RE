@@ -3,9 +3,9 @@
 // docs/schema/schema.sql is the source of truth for the actual database
 // structure (it's what you run to create/migrate the DB). This file is
 // a typed query layer on top of that — only the tables/views the slices
-// built so far (Costs + Cash Flow Engine, Revenue/For Sale) actually
-// touch are mapped here. Extend it domain by domain as later slices
-// (Plan, Capital, Business Plan, Platform Core) get built.
+// built so far (Costs + Cash Flow Engine, Revenue/For Sale, Capital)
+// actually touch are mapped here. Extend it domain by domain as later
+// slices (Plan, Business Plan, Platform Core) get built.
 import {
   pgTable,
   pgView,
@@ -87,6 +87,8 @@ export const approvalStatus = pgEnum("approval_status", ["pending", "approved", 
 export const unitStatus = pgEnum("unit_status", ["available", "reserved", "sold"]);
 
 export const collectionStatus = pgEnum("collection_status", ["pending", "paid", "overdue"]);
+
+export const debtDrawStatus = pgEnum("debt_draw_status", ["requested", "submitted", "approved", "funded"]);
 
 export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -307,6 +309,90 @@ export const collections = pgTable("collections", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// --- Capital — equity y deuda (§6, solo Equity First, decisión 8·07) ---
+
+export const debtFacilities = pgTable("debt_facilities", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull(),
+  lenderId: uuid("lender_id").notNull(),
+  loanAmount: numeric("loan_amount", { precision: 18, scale: 2 }).notNull(),
+  ltc: numeric("ltc", { precision: 9, scale: 6 }),
+  ltv: numeric("ltv", { precision: 9, scale: 6 }),
+  referenceRate: text("reference_rate"),
+  spreadBps: integer("spread_bps"),
+  termMonths: integer("term_months"),
+  amortizationMonths: integer("amortization_months"),
+  interestReserve: numeric("interest_reserve", { precision: 18, scale: 2 }).default("0"),
+  commitmentFeePct: numeric("commitment_fee_pct", { precision: 9, scale: 6 }).default("0"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// "Captura manual, sin alertas automáticas en MVP" (§5) — no hay motor
+// que evalúe el covenant contra datos reales, es un registro de lo que
+// alguien revisó a mano.
+export const debtCovenants = pgTable("debt_covenants", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  debtFacilityId: uuid("debt_facility_id").notNull(),
+  name: text("name").notNull(),
+  threshold: text("threshold").notNull(),
+  lastTestedStatus: text("last_tested_status"),
+  lastTestedAt: date("last_tested_at"),
+});
+
+// requested_amount lo pre-calcula lib/capital/equityFirst.ts a partir
+// del déficit de caja del mes (§4.4); la UI permite ajustarlo antes de
+// enviar. Sin "rejected" en el enum — es un avance lineal
+// requested→submitted→approved→funded, no una decisión binaria como
+// Invoice.
+export const debtDraws = pgTable("debt_draws", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  debtFacilityId: uuid("debt_facility_id").notNull(),
+  periodMonth: date("period_month").notNull(),
+  requestedAmount: numeric("requested_amount", { precision: 18, scale: 2 }).notNull(),
+  fundedAmount: numeric("funded_amount", { precision: 18, scale: 2 }),
+  status: debtDrawStatus("status").notNull().default("requested"),
+  fundedDate: date("funded_date"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const debtPayments = pgTable("debt_payments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  debtFacilityId: uuid("debt_facility_id").notNull(),
+  periodMonth: date("period_month").notNull(),
+  interestAmount: numeric("interest_amount", { precision: 18, scale: 2 }).notNull().default("0"),
+  principalAmount: numeric("principal_amount", { precision: 18, scale: 2 }).notNull().default("0"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const equityInvestors = pgTable("equity_investors", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull(),
+  counterpartyId: uuid("counterparty_id"), // null = sponsor propio
+  name: text("name").notNull(),
+  commitmentAmount: numeric("commitment_amount", { precision: 18, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const equityContributions = pgTable("equity_contributions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  equityInvestorId: uuid("equity_investor_id").notNull(),
+  periodMonth: date("period_month").notNull(),
+  amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Sin UI/acción todavía — no hay evento de negocio (exit, refinanciamiento)
+// que las dispare en esta vuelta; se mapea porque ya existe en schema.sql.
+export const distributions = pgTable("distributions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  equityInvestorId: uuid("equity_investor_id").notNull(),
+  periodMonth: date("period_month").notNull(),
+  amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // --- Derived views (§4.1 — "calculado, nunca capturado") ---------------
 
 export const contractRollup = pgView("contract_rollup", {
@@ -334,4 +420,22 @@ export const saleCollectionRollup = pgView("sale_collection_rollup", {
   collectedAmount: numeric("collected_amount", { precision: 18, scale: 2 }),
   pendingAmount: numeric("pending_amount", { precision: 18, scale: 2 }),
   overdueAmount: numeric("overdue_amount", { precision: 18, scale: 2 }),
+}).existing();
+
+export const debtFacilityRollup = pgView("debt_facility_rollup", {
+  debtFacilityId: uuid("debt_facility_id"),
+  loanAmount: numeric("loan_amount", { precision: 18, scale: 2 }),
+  fundedAmount: numeric("funded_amount", { precision: 18, scale: 2 }),
+  principalPaid: numeric("principal_paid", { precision: 18, scale: 2 }),
+  outstandingBalance: numeric("outstanding_balance", { precision: 18, scale: 2 }),
+  availableToDraw: numeric("available_to_draw", { precision: 18, scale: 2 }),
+}).existing();
+
+export const equityInvestorRollup = pgView("equity_investor_rollup", {
+  equityInvestorId: uuid("equity_investor_id"),
+  projectId: uuid("project_id"),
+  commitmentAmount: numeric("commitment_amount", { precision: 18, scale: 2 }),
+  contributedAmount: numeric("contributed_amount", { precision: 18, scale: 2 }),
+  distributedAmount: numeric("distributed_amount", { precision: 18, scale: 2 }),
+  remainingCommitment: numeric("remaining_commitment", { precision: 18, scale: 2 }),
 }).existing();
