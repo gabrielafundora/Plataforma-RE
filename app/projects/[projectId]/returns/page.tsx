@@ -10,9 +10,11 @@ import { calculateIRR, calculateNPV, calculateMOIC } from "@/lib/businessplan/re
 
 // Pantalla 17 — Returns / Business Plan (§7.1), recortada a lo que se
 // puede derivar en vivo. La spec completa compara Baseline vs. Actual
-// vs. Current Forecast por Snapshot — los Snapshots los genera Monthly
-// Close (pantalla 18, no construida todavía), así que esta vuelta solo
-// muestra el Current Forecast, sin columnas de comparación. Yield on
+// vs. Current Forecast por Snapshot — Monthly Close (pantalla 18) ya
+// genera esos Snapshots (ver /snapshots), pero esta pantalla sigue
+// mostrando solo el Current Forecast en vivo, sin comparación inline;
+// no hay columna "Baseline" real porque esta app no tiene flujo de
+// Deal/Underwriting que congele un Scenario aprobado (§3.3). Yield on
 // Cost / Development Spread quedan fuera: necesitan un pro forma de
 // operación estabilizada que este MVP no modela.
 export const dynamic = "force-dynamic";
@@ -61,8 +63,11 @@ export default async function ProjectReturnsPage({ params }: { params: Promise<{
         <div className="text-sm text-ink-soft">Returns</div>
         <h1 className="mt-1 font-display text-2xl font-semibold text-ink">{project.name}</h1>
         <p className="mt-1 text-xs text-ink-faint">
-          Current Forecast — sin comparación Baseline/Actual todavía (requiere Monthly Close, no
-          construido en esta vuelta).
+          Current Forecast, en vivo. Para lo ya cerrado mes a mes, ver{" "}
+          <Link href={`/projects/${projectId}/snapshots`} className="text-blueprint hover:underline">
+            Snapshots
+          </Link>
+          .
         </p>
 
         <h2 className="mt-8 font-display text-lg font-semibold text-ink">Retornos</h2>
@@ -125,9 +130,9 @@ export default async function ProjectReturnsPage({ params }: { params: Promise<{
         </p>
 
         <p className="mt-8 max-w-2xl text-xs text-ink-faint">
-          Fuera de esta vuelta (disclosed, no silencioso): comparación Baseline/Actual/Current Forecast
-          por Snapshot (§3.3, requiere Monthly Close) · Yield on Cost · Development Spread (necesitan un
-          pro forma de operación estabilizada no modelado en el MVP).
+          Fuera de esta vuelta (disclosed, no silencioso): Yield on Cost · Development Spread
+          (necesitan un pro forma de operación estabilizada no modelado en el MVP) · columna
+          "Baseline" en Snapshots (requiere un flujo de Deal/Underwriting que esta app no construyó).
         </p>
       </main>
     </>

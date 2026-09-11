@@ -1,10 +1,10 @@
-// Business Plan — Returns (§7.1, pantalla 17), recortado a lo que se
-// puede calcular en vivo sin Monthly Close: "decisión 8·09 — nunca
+// Business Plan — Returns (§7.1, pantalla 17): "decisión 8·09 — nunca
 // captura assumptions manualmente" sigue aplicando (todo se deriva del
-// mismo cash flow mensual de Project Cash Flow, pantalla 16), pero la
-// comparación Baseline/Actual/Current Forecast por Snapshot queda fuera
-// de esta vuelta porque Snapshot lo genera Monthly Close (pantalla 18,
-// no construida todavía) — ver docs/strategy §3.3.
+// mismo cash flow mensual de Project Cash Flow, pantalla 16). Estas
+// mismas funciones las usa /returns (en vivo) y lib/actions/
+// monthlyClose.ts (para congelar el resultado en un Snapshot al cerrar
+// el periodo — ver lib/monthlyClose/buildSnapshotRows.ts) — ver
+// docs/strategy §3.3 y §4.6.
 
 function npvAtMonthlyRate(monthlyRate: number, cashFlows: number[]): number {
   return cashFlows.reduce((sum, cf, t) => sum + cf / Math.pow(1 + monthlyRate, t), 0);

@@ -31,6 +31,8 @@ export function ProjectNav({
     | "equity"
     | "cashflow"
     | "returns"
+    | "monthlyClose"
+    | "snapshots"
     | "settings";
 }) {
   const tabs = [
@@ -46,6 +48,8 @@ export function ProjectNav({
     { key: "equity", label: "Equity", href: `/projects/${projectId}/equity` },
     { key: "cashflow", label: "Cash Flow", href: `/projects/${projectId}/cashflow` },
     { key: "returns", label: "Returns", href: `/projects/${projectId}/returns` },
+    { key: "monthlyClose", label: "Cierre de mes", href: `/projects/${projectId}/monthly-close` },
+    { key: "snapshots", label: "Snapshots", href: `/projects/${projectId}/snapshots` },
     { key: "settings", label: "Configuración", href: `/projects/${projectId}/settings` },
   ] as const;
 

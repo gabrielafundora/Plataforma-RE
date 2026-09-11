@@ -4,8 +4,9 @@
 // structure (it's what you run to create/migrate the DB). This file is
 // a typed query layer on top of that — only the tables/views the slices
 // built so far (Costs + Cash Flow Engine, Revenue/For Sale, Capital,
-// Plan/Schedule, Business Plan) actually touch are mapped here. Extend
-// it domain by domain as later slices (Platform Core) get built.
+// Plan/Schedule, Business Plan + Monthly Close) actually touch are
+// mapped here. Extend it domain by domain as later slices (Platform
+// Core) get built.
 import {
   pgTable,
   pgView,
@@ -89,6 +90,34 @@ export const unitStatus = pgEnum("unit_status", ["available", "reserved", "sold"
 export const collectionStatus = pgEnum("collection_status", ["pending", "paid", "overdue"]);
 
 export const debtDrawStatus = pgEnum("debt_draw_status", ["requested", "submitted", "approved", "funded"]);
+
+// --- Monthly Close / Business Plan Snapshot (§3.3, §4.6) ---
+export const snapshotType = pgEnum("snapshot_type", ["baseline", "monthly_close"]);
+
+export const cashFlowCategory = pgEnum("cash_flow_category", [
+  "revenue",
+  "cost",
+  "debt_draw",
+  "debt_interest",
+  "debt_principal",
+  "equity_contribution",
+  "equity_distribution",
+]);
+
+export const returnMetricKey = pgEnum("return_metric_key", [
+  "irr_unlevered",
+  "irr_levered",
+  "moic",
+  "npv",
+  "yield_on_cost",
+  "development_spread",
+  "profit_margin",
+  "total_development_cost",
+  "equity_required",
+  "peak_equity",
+]);
+
+export const returnScope = pgEnum("return_scope", ["project", "equity", "asset"]);
 
 export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -417,6 +446,46 @@ export const distributions = pgTable("distributions", {
   periodMonth: date("period_month").notNull(),
   amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Monthly Close (§4.6, §7.1 pantalla 18) crea exactamente un snapshot
+// type='monthly_close' por corte. type='baseline' (congelado al aprobar
+// el Deal desde un Scenario elegido — §3.3) no tiene flujo de UW
+// construido todavía en esta app, así que sourceScenarioId siempre
+// queda null en la práctica — se mapea la columna porque la tabla
+// `scenarios` que referencia ya existe en schema.sql (scaffold
+// original), pero `scenarios`/`scenario_assumptions` en sí no se
+// mapean aquí: nada en la UI de esta vuelta los toca todavía.
+export const snapshots = pgTable("snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull(),
+  type: snapshotType("type").notNull(),
+  sourceScenarioId: uuid("source_scenario_id"),
+  periodMonth: date("period_month"),
+  createdBy: uuid("created_by").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const cashFlowPeriods = pgTable("cash_flow_periods", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  snapshotId: uuid("snapshot_id").notNull(),
+  periodMonth: date("period_month").notNull(),
+  isActual: boolean("is_actual").notNull(),
+});
+
+export const cashFlowLines = pgTable("cash_flow_lines", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  cashFlowPeriodId: uuid("cash_flow_period_id").notNull(),
+  category: cashFlowCategory("category").notNull(),
+  amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+});
+
+export const returnMetrics = pgTable("return_metrics", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  snapshotId: uuid("snapshot_id").notNull(),
+  scope: returnScope("scope").notNull().default("project"),
+  metricKey: returnMetricKey("metric_key").notNull(),
+  value: numeric("value", { precision: 18, scale: 6 }).notNull(),
 });
 
 // --- Derived views (§4.1 — "calculado, nunca capturado") ---------------
