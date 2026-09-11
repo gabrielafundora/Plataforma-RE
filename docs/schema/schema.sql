@@ -19,6 +19,22 @@
 create extension if not exists pgcrypto; -- gen_random_uuid()
 
 -- ---------------------------------------------------------------------
+-- 0. MIGRACIONES — tracking de docs/schema/migrations/*.sql
+-- ---------------------------------------------------------------------
+-- Este archivo sigue siendo la definición completa para una base nueva
+-- (npm run db:migrate, no idempotente — solo para dev). Una base que YA
+-- existe (como producción) se pone al día con
+-- docs/schema/migrations/*.sql vía npm run db:migrate:incremental,
+-- corrido automáticamente en cada deploy (script "vercel-build") —
+-- ver docs/schema/README.md. Cualquier cambio a este archivo debe venir
+-- acompañado de su propio archivo idempotente en migrations/.
+create table if not exists schema_migrations (
+  id uuid primary key default gen_random_uuid(),
+  filename text not null unique,
+  applied_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------
 -- 1. ENUMS
 -- ---------------------------------------------------------------------
 

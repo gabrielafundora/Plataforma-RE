@@ -12,7 +12,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:migrate": "tsx --env-file=.env.local lib/db/migrate.ts",
-    "db:seed": "tsx --env-file=.env.local lib/db/seed.ts"
+    "db:migrate:incremental": "tsx --env-file=.env.local lib/db/migrateIncremental.ts",
+    "db:seed": "tsx --env-file=.env.local lib/db/seed.ts",
+    "vercel-build": "tsx lib/db/migrateIncremental.ts && next build"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

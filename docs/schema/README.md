@@ -58,3 +58,31 @@ DATABASE_URL=postgres://... npx tsx lib/db/migrate.ts
 ```
 
 Requiere la extensión `pgcrypto` (se crea automáticamente vía `CREATE EXTENSION IF NOT EXISTS` al inicio del archivo) para `gen_random_uuid()`.
+
+## Cómo se mantiene al día una base que ya existe (producción)
+
+`npm run db:migrate` re-aplica `schema.sql` completo — sus `create table`
+no llevan `if not exists`, así que solo es seguro contra una base vacía
+(dev). Nunca se corrió, ni se debe correr, contra una base que ya tiene
+tablas y datos.
+
+Para eso existe `docs/schema/migrations/` — un archivo `.sql` por cada
+cambio incremental a `schema.sql`, escrito de forma idempotente
+(`create table if not exists`, `alter table ... add column if not
+exists`, `create or replace view`, y el patrón `do $$ ... exception when
+duplicate_object then null; end $$;` para los `create type ... as enum`,
+que no soportan `if not exists`). `npm run db:migrate:incremental`
+(`lib/db/migrateIncremental.ts`) aplica solo los archivos que todavía no
+estén registrados en la tabla `schema_migrations`, y se corre
+automáticamente en cada deploy de Vercel vía el script `"vercel-build"`
+de `package.json` — así un cambio de schema nunca vuelve a depender de
+que alguien recuerde correr el `ALTER` a mano en la consola de Neon (los
+incidentes de `projects.forecast_months` y de
+`units`/`collections.updated_at`, ambos documentados como los primeros
+dos archivos en `migrations/`).
+
+**Regla al tocar `schema.sql`:** todo cambio va acompañado de su propio
+archivo nuevo en `docs/schema/migrations/<NNNN>_<slug>.sql` con
+únicamente ese diff, idempotente. `schema.sql` sigue siendo la
+definición completa (para levantar una base nueva desde cero);
+`migrations/` es el changelog que pone al día una base existente.
