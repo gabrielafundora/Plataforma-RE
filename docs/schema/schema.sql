@@ -392,6 +392,7 @@ create table units (
   price_per_m2  numeric(14,2) not null,
   status        unit_status not null default 'available',
   created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
   unique (phase_id, code)
 );
 create index on units(phase_id, status);
@@ -414,7 +415,8 @@ create table collections (
   amount       numeric(18,2) not null,
   paid_date    date,
   status       collection_status not null default 'pending',
-  created_at   timestamptz not null default now()
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
 );
 create index on collections(sale_id, status);
 
@@ -723,6 +725,27 @@ comment on view budget_line_rollup is
   'forecast_to_complete_naive es la línea recta simple; el forecast '
   'ajustado por método (S-Curve/Milestone/etc., §4.2) lo calcula el '
   'Cash Flow Engine en la capa de aplicación, no esta vista.';
+
+-- Rollup de Sale: cobrado a la fecha vs. pendiente vs. vencido, por venta.
+-- Es el equivalente del lado de Revenue a contract_rollup — nunca se
+-- escribe directamente, se deriva de collections.
+create or replace view sale_collection_rollup as
+select
+  s.id as sale_id,
+  s.unit_id,
+  s.price_total,
+  coalesce(sum(c.amount) filter (where c.status = 'paid'), 0) as collected_amount,
+  coalesce(sum(c.amount) filter (where c.status = 'pending'), 0) as pending_amount,
+  coalesce(sum(c.amount) filter (where c.status = 'overdue'), 0) as overdue_amount
+from sales s
+left join collections c on c.sale_id = s.id
+group by s.id, s.unit_id, s.price_total;
+
+comment on view sale_collection_rollup is
+  'Collected-to-date vs. contratado (price_total) por Sale — Sales != Cash '
+  'Collections (§1.1). overdue_amount depende de collections.status, que '
+  'nadie transiciona automáticamente todavía: hoy siempre es 0 salvo que '
+  'se marque a mano.';
 
 -- =====================================================================
 -- 10. SEED DATA — reglas de aprobación fijas (Approval Authorities, §4.7)

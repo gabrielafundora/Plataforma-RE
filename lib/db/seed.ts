@@ -4,6 +4,7 @@
 // one contract, so there's something to click into right away.
 //
 // Run with: npm run db:seed
+import { eq } from "drizzle-orm";
 import { db } from "./client";
 import {
   organizations,
@@ -15,8 +16,12 @@ import {
   budgetLines,
   counterparties,
   contracts,
+  units,
+  sales,
+  collections,
 } from "./schema";
 import { RESIDENTIAL_FOR_SALE_CATALOG, isLeaf } from "../costCodes/defaultCatalog";
+import { buildPaymentPlan, expandPaymentPlan } from "../revenue/paymentPlan";
 
 // Leaf amounts chosen so Soft Costs sums to 50M and Hard Costs to 300M —
 // the same totals the original single-line demo used — just spread
@@ -144,14 +149,67 @@ async function main() {
     })
     .returning();
 
+  // Revenue — motor For Sale (§5). Un puñado de unidades disponibles más
+  // una ya vendida, con su plan de pagos parcialmente cobrado, para que
+  // Inventario y Cobranza tengan algo real que mostrar desde el primer
+  // día (Real = ya cobrado, Forecast = pendiente, incluyendo algo ya
+  // vencido si "hoy" cae después de esas fechas).
+  const unitSeeds = [
+    { code: "A101", unitType: "2BR", areaM2: "78.00", pricePerM2: "55000" },
+    { code: "A102", unitType: "2BR", areaM2: "78.00", pricePerM2: "55000" },
+    { code: "A103", unitType: "2BR", areaM2: "78.00", pricePerM2: "55000" },
+    { code: "A104", unitType: "2BR", areaM2: "78.00", pricePerM2: "55000" },
+    { code: "A105", unitType: "2BR", areaM2: "78.00", pricePerM2: "55000" },
+    { code: "B101", unitType: "3BR", areaM2: "95.00", pricePerM2: "58000" },
+    { code: "B102", unitType: "3BR", areaM2: "95.00", pricePerM2: "58000" },
+  ];
+
+  const unitIdByCode = new Map<string, string>();
+  for (const u of unitSeeds) {
+    const [row] = await db.insert(units).values({ phaseId: phase.id, ...u }).returning();
+    unitIdByCode.set(u.code, row.id);
+  }
+
+  const soldUnitId = unitIdByCode.get("A105")!;
+  const priceTotal = 78 * 55000;
+  const saleDate = "2026-01-15";
+  const paymentPlan = buildPaymentPlan(priceTotal, {
+    downPaymentPct: 0.2,
+    closingPct: 0.1,
+    installmentsCount: 6,
+    closingOffsetMonths: 10,
+  });
+  const schedule = expandPaymentPlan(saleDate, paymentPlan);
+
+  const [sale] = await db
+    .insert(sales)
+    .values({ unitId: soldUnitId, saleDate, priceTotal: String(priceTotal), paymentPlan })
+    .returning();
+
+  const paidThroughDate = "2026-03-15"; // enganche + Feb + Mar ya cobrados; el resto queda pendiente/vencido
+  await db.insert(collections).values(
+    schedule.map((row) => ({
+      saleId: sale.id,
+      dueDate: row.dueDate,
+      amount: String(row.amount),
+      status: row.dueDate <= paidThroughDate ? ("paid" as const) : ("pending" as const),
+      paidDate: row.dueDate <= paidThroughDate ? row.dueDate : null,
+    }))
+  );
+
+  await db.update(units).set({ status: "sold" }).where(eq(units.id, soldUnitId));
+
   console.log("Seeded:", {
     organizationId: org.id,
     userId: user.id,
     projectId: project.id,
     phaseId: phase.id,
     contractId: contract.id,
+    saleId: sale.id,
   });
   console.log(`\nOpen: http://localhost:3000/projects/${project.id}/budget`);
+  console.log(`      http://localhost:3000/projects/${project.id}/inventory`);
+  console.log(`      http://localhost:3000/projects/${project.id}/collections`);
 
   process.exit(0);
 }

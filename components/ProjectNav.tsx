@@ -8,7 +8,15 @@ export function ProjectNav({
   active,
 }: {
   projectId: string;
-  active: "overview" | "budget" | "forecast" | "contracts" | "invoices" | "settings";
+  active:
+    | "overview"
+    | "budget"
+    | "forecast"
+    | "contracts"
+    | "invoices"
+    | "inventory"
+    | "collections"
+    | "settings";
 }) {
   const tabs = [
     { key: "overview", label: "Overview", href: `/projects/${projectId}` },
@@ -16,6 +24,8 @@ export function ProjectNav({
     { key: "forecast", label: "Forecast", href: `/projects/${projectId}/forecast` },
     { key: "contracts", label: "Contratos", href: `/projects/${projectId}/contracts` },
     { key: "invoices", label: "Facturas", href: `/projects/${projectId}/invoices` },
+    { key: "inventory", label: "Inventario", href: `/projects/${projectId}/inventory` },
+    { key: "collections", label: "Cobranza", href: `/projects/${projectId}/collections` },
     { key: "settings", label: "Configuración", href: `/projects/${projectId}/settings` },
   ] as const;
 

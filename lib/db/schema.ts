@@ -2,10 +2,10 @@
 //
 // docs/schema/schema.sql is the source of truth for the actual database
 // structure (it's what you run to create/migrate the DB). This file is
-// a typed query layer on top of that — only the tables/views this
-// vertical slice (Costs + Cash Flow Engine) actually touches are
-// mapped here. Extend it domain by domain as later slices (Plan,
-// Revenue, Capital, Business Plan, Platform Core) get built.
+// a typed query layer on top of that — only the tables/views the slices
+// built so far (Costs + Cash Flow Engine, Revenue/For Sale) actually
+// touch are mapped here. Extend it domain by domain as later slices
+// (Plan, Capital, Business Plan, Platform Core) get built.
 import {
   pgTable,
   pgView,
@@ -83,6 +83,10 @@ export const approvalEntityType = pgEnum("approval_entity_type", [
 ]);
 
 export const approvalStatus = pgEnum("approval_status", ["pending", "approved", "rejected"]);
+
+export const unitStatus = pgEnum("unit_status", ["available", "reserved", "sold"]);
+
+export const collectionStatus = pgEnum("collection_status", ["pending", "paid", "overdue"]);
 
 export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -262,6 +266,47 @@ export const approvalRequests = pgTable("approval_requests", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// --- Revenue — motor For Sale (§5, único en MVP) -----------------------
+
+export const units = pgTable("units", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  phaseId: uuid("phase_id").notNull(),
+  code: text("code").notNull(),
+  unitType: text("unit_type").notNull(),
+  areaM2: numeric("area_m2", { precision: 10, scale: 2 }).notNull(),
+  pricePerM2: numeric("price_per_m2", { precision: 14, scale: 2 }).notNull(),
+  status: unitStatus("status").notNull().default("available"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// "Sales != Cash Collections" (§1.1) — price_total es lo contratado, no
+// lo cobrado; ver collections para lo efectivamente cobrado. payment_plan
+// se captura tal cual se acordó (ver lib/revenue/paymentPlan.ts para su
+// forma) — de ahí se derivan las filas de `collections` al registrar la
+// venta, una sola vez; el plan guardado aquí ya no vuelve a leerse para
+// calcular nada (a diferencia del forecast_method de Costs, que sí se
+// reevalúa cada vez).
+export const sales = pgTable("sales", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  unitId: uuid("unit_id").notNull(),
+  saleDate: date("sale_date").notNull(),
+  priceTotal: numeric("price_total", { precision: 18, scale: 2 }).notNull(),
+  paymentPlan: jsonb("payment_plan").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const collections = pgTable("collections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  saleId: uuid("sale_id").notNull(),
+  dueDate: date("due_date").notNull(),
+  amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+  paidDate: date("paid_date"),
+  status: collectionStatus("status").notNull().default("pending"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // --- Derived views (§4.1 — "calculado, nunca capturado") ---------------
 
 export const contractRollup = pgView("contract_rollup", {
@@ -280,4 +325,13 @@ export const budgetLineRollup = pgView("budget_line_rollup", {
   actualCost: numeric("actual_cost", { precision: 18, scale: 2 }),
   forecastToCompleteNaive: numeric("forecast_to_complete_naive", { precision: 18, scale: 2 }),
   forecastMethod: forecastMethod("forecast_method"),
+}).existing();
+
+export const saleCollectionRollup = pgView("sale_collection_rollup", {
+  saleId: uuid("sale_id"),
+  unitId: uuid("unit_id"),
+  priceTotal: numeric("price_total", { precision: 18, scale: 2 }),
+  collectedAmount: numeric("collected_amount", { precision: 18, scale: 2 }),
+  pendingAmount: numeric("pending_amount", { precision: 18, scale: 2 }),
+  overdueAmount: numeric("overdue_amount", { precision: 18, scale: 2 }),
 }).existing();

@@ -17,6 +17,12 @@ const STYLES: Record<string, string> = {
   paid: "bg-success-soft text-success",
   rejected: "bg-redline-soft text-redline",
   terminated: "bg-redline-soft text-redline",
+
+  available: "bg-blueprint-soft text-blueprint",
+  reserved: "bg-warning-soft text-warning",
+  sold: "bg-success-soft text-success",
+  pending: "bg-warning-soft text-warning",
+  overdue: "bg-redline-soft text-redline",
 };
 
 const LABELS: Record<string, string> = {
