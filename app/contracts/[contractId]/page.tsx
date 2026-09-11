@@ -131,13 +131,13 @@ export default async function ContractDetailPage({
                     {co.scheduleImpactDays !== 0 && <> · {co.scheduleImpactDays > 0 ? "+" : ""}{co.scheduleImpactDays}d schedule</>}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   {co.status === "submitted" && co.requiredRole && (
                     <span className="text-xs text-ink-faint">Requiere: {co.requiredRole.replace(/_/g, " ")}</span>
                   )}
                   <StatusBadge status={co.status} />
                   {co.status === "submitted" && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <form action={decideChangeOrder}>
                         <input type="hidden" name="changeOrderId" value={co.id} />
                         <input type="hidden" name="decision" value="approved" />
@@ -215,13 +215,13 @@ export default async function ContractDetailPage({
                   {inv.invoiceDate} · {formatMoney(inv.netAmount)}
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 {inv.status === "submitted" && inv.requiredRole && (
                   <span className="text-xs text-ink-faint">Requiere: {inv.requiredRole.replace(/_/g, " ")}</span>
                 )}
                 <StatusBadge status={inv.status} />
                 {inv.status === "submitted" && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <form action={decideInvoice}>
                       <input type="hidden" name="invoiceId" value={inv.id} />
                       <input type="hidden" name="decision" value="approved" />
@@ -239,7 +239,7 @@ export default async function ContractDetailPage({
                   </div>
                 )}
                 {inv.status === "approved" && (
-                  <form action={markInvoicePaid} className="flex items-center gap-2">
+                  <form action={markInvoicePaid} className="flex flex-wrap items-center gap-2">
                     <input type="hidden" name="invoiceId" value={inv.id} />
                     <input type="hidden" name="amount" value={inv.netAmount ?? ""} />
                     <input

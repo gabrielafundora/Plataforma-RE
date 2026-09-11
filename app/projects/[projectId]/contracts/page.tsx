@@ -90,7 +90,7 @@ export default async function ProjectContractsPage({
                     {c.costCode} · {c.costCodeDescription}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <div className="text-right text-sm">
                     <div className="font-medium tabular-nums text-ink">{formatMoney(c.current)}</div>
                     <div className="tabular-nums text-ink-faint">pagado {formatMoney(c.paid)}</div>

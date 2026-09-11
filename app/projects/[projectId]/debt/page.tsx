@@ -242,7 +242,7 @@ async function FacilityDetail({
               <span className="text-sm text-ink-soft">· solicitado {formatMoney(d.requestedAmount)}</span>
               {d.fundedAmount && <span className="text-sm text-ink-faint"> · fondeado {formatMoney(d.fundedAmount)}</span>}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={d.status} />
               {d.status === "requested" && (
                 <form action={submitDraw}>
@@ -261,7 +261,7 @@ async function FacilityDetail({
                 </form>
               )}
               {d.status === "approved" && (
-                <form action={fundDraw} className="flex items-center gap-2">
+                <form action={fundDraw} className="flex flex-wrap items-center gap-2">
                   <input type="hidden" name="drawId" value={d.id} />
                   <input type="hidden" name="fundedAmount" value={d.requestedAmount} />
                   <input
@@ -328,7 +328,7 @@ async function FacilityDetail({
                   <span className="text-ink-faint"> · última prueba: {c.lastTestedStatus} ({c.lastTestedAt})</span>
                 )}
               </div>
-              <form action={recordCovenantTest} className="flex items-center gap-2">
+              <form action={recordCovenantTest} className="flex flex-wrap items-center gap-2">
                 <input type="hidden" name="covenantId" value={c.id} />
                 <select name="status" required className="rounded-lg border border-line-strong bg-surface px-2 py-1 text-xs text-ink">
                   <option value="cumple">Cumple</option>

@@ -109,13 +109,13 @@ export default async function BudgetPage({ params }: { params: Promise<{ project
       <AppHeader crumb={<Link href="/" className="hover:text-blueprint">Mis Proyectos</Link>} />
       <ProjectNav projectId={projectId} active="budget" />
       <main className="mx-auto max-w-6xl px-6 py-12">
-        <div className="flex items-end justify-between">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <div className="text-sm text-ink-soft">Control Presupuestal</div>
             <h1 className="mt-1 font-display text-2xl font-semibold text-ink">{project?.name ?? "Proyecto"}</h1>
           </div>
           {sortedGroups.length > 0 && (
-            <div className="flex items-center gap-6">
+            <div className="flex flex-wrap items-center gap-6">
               <Link
                 href={`/projects/${projectId}/budget/setup`}
                 className="rounded-lg bg-blueprint px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"

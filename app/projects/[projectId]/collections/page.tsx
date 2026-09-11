@@ -78,7 +78,7 @@ export default async function ProjectCollectionsPage({ params }: { params: Promi
         <div className="text-sm text-ink-soft">Cobranza</div>
         <h1 className="mt-1 font-display text-2xl font-semibold text-ink">{project.name}</h1>
 
-        <div className="mt-6 grid grid-cols-3 gap-3">
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Stat label="Contratado" value={formatMoney(totalContracted)} />
           <Stat label="Cobrado" value={formatMoney(totalCollected)} tone="good" />
           <Stat label="Pendiente" value={formatMoney(totalPending)} />
@@ -122,7 +122,7 @@ export default async function ProjectCollectionsPage({ params }: { params: Promi
                           <StatusBadge status={isOverdue ? "overdue" : r.status} />
                           {r.status === "pending" && (
                             <>
-                              <form action={registerCollection} className="flex items-center gap-1.5">
+                              <form action={registerCollection} className="flex flex-wrap items-center gap-1.5">
                                 <input type="hidden" name="collectionId" value={r.id} />
                                 <input type="hidden" name="amount" value={r.amount} />
                                 <input
@@ -136,7 +136,7 @@ export default async function ProjectCollectionsPage({ params }: { params: Promi
                                   Registrar cobro
                                 </button>
                               </form>
-                              <form action={rescheduleCollection} className="flex items-center gap-1.5">
+                              <form action={rescheduleCollection} className="flex flex-wrap items-center gap-1.5">
                                 <input type="hidden" name="collectionId" value={r.id} />
                                 <input
                                   type="date"

@@ -100,13 +100,13 @@ export default async function ProjectInvoicesPage({
                   {inv.costCode} · {inv.costCodeDescription} · {inv.invoiceDate} · {formatMoney(inv.netAmount)}
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 {inv.status === "submitted" && inv.requiredRole && (
                   <span className="text-xs text-ink-faint">Requiere: {inv.requiredRole.replace(/_/g, " ")}</span>
                 )}
                 <StatusBadge status={inv.status} />
                 {inv.status === "submitted" && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <form action={decideInvoice}>
                       <input type="hidden" name="invoiceId" value={inv.id} />
                       <input type="hidden" name="decision" value="approved" />
@@ -124,7 +124,7 @@ export default async function ProjectInvoicesPage({
                   </div>
                 )}
                 {inv.status === "approved" && (
-                  <form action={markInvoicePaid} className="flex items-center gap-2">
+                  <form action={markInvoicePaid} className="flex flex-wrap items-center gap-2">
                     <input type="hidden" name="invoiceId" value={inv.id} />
                     <input type="hidden" name="amount" value={inv.netAmount ?? ""} />
                     <input

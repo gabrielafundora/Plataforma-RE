@@ -3,6 +3,16 @@ import Link from "next/link";
 // Project-level sub-nav (Wireframe B's project nav: Overview/Plan/Costs/
 // Revenue/Capital/Business Plan/...). Only tabs for screens that actually
 // exist in this slice are shown — no dead links to unbuilt modules.
+//
+// Con 12 pestañas, en escritorio sigue siendo la fila horizontal de
+// siempre — pero en celular eso nunca cabe bien, ni siquiera
+// deslizable (ningún indicio visual de que hay más, y toma muchos
+// swipes llegar a "Configuración"). Abajo del breakpoint sm se
+// colapsa en un menú tipo hamburguesa (☰ + nombre de la pestaña
+// activa), con las pestañas apiladas verticalmente al abrirlo — sin
+// JS de cliente, con el truco de checkbox+label oculto (mismo
+// espíritu del resto de la app: FormattedNumberInput sigue siendo el
+// único componente que sí necesita "use client").
 export function ProjectNav({
   projectId,
   active,
@@ -37,23 +47,40 @@ export function ProjectNav({
     { key: "settings", label: "Configuración", href: `/projects/${projectId}/settings` },
   ] as const;
 
+  const activeLabel = tabs.find((t) => t.key === active)?.label ?? "Menú";
+  const toggleId = `projectnav-toggle-${projectId}`;
+
   return (
     <div className="border-b border-line bg-surface">
-      <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-6">
-        {tabs.map((tab) => (
-          <Link
-            key={tab.key}
-            href={tab.href}
-            className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium transition-colors ${
-              active === tab.key
-                ? "border-blueprint text-blueprint"
-                : "border-transparent text-ink-soft hover:text-ink"
-            }`}
-          >
-            {tab.label}
-          </Link>
-        ))}
-      </nav>
+      <div className="mx-auto max-w-6xl px-6">
+        {/* key={active}: fuerza a React a montar un checkbox nuevo (sin
+            marcar) cada vez que cambia de pestaña, para que el menú no
+            se quede abierto después de navegar. */}
+        <input key={active} type="checkbox" id={toggleId} className="peer hidden" />
+        <label
+          htmlFor={toggleId}
+          className="flex cursor-pointer items-center justify-between py-3 text-sm font-medium text-ink sm:hidden"
+        >
+          <span>☰ {activeLabel}</span>
+          <span className="text-ink-faint">▾</span>
+        </label>
+
+        <nav className="hidden flex-col peer-checked:flex sm:flex sm:flex-row sm:gap-1 sm:overflow-x-auto">
+          {tabs.map((tab) => (
+            <Link
+              key={tab.key}
+              href={tab.href}
+              className={`block border-l-2 px-3 py-2.5 text-sm font-medium transition-colors sm:inline-block sm:shrink-0 sm:whitespace-nowrap sm:border-b-2 sm:border-l-0 sm:py-3 ${
+                active === tab.key
+                  ? "border-blueprint bg-blueprint-soft/40 text-blueprint sm:bg-transparent"
+                  : "border-transparent text-ink-soft hover:text-ink"
+              }`}
+            >
+              {tab.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
     </div>
   );
 }

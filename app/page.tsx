@@ -38,7 +38,7 @@ export default async function HomePage() {
             <li key={p.id}>
               <Link
                 href={`/projects/${p.id}`}
-                className="flex items-center justify-between rounded-xl border border-line bg-surface p-5 shadow-sm transition-shadow hover:shadow-md"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-5 shadow-sm transition-shadow hover:shadow-md"
               >
                 <div>
                   <div className="font-display text-lg font-medium text-ink">{p.name}</div>

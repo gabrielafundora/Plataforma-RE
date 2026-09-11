@@ -66,7 +66,7 @@ export default async function ProjectEquityPage({ params }: { params: Promise<{ 
         <div className="text-sm text-ink-soft">Equity</div>
         <h1 className="mt-1 font-display text-2xl font-semibold text-ink">{project.name}</h1>
 
-        <div className="mt-6 grid grid-cols-3 gap-3">
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Stat label="Comprometido" value={formatMoney(totalCommitted)} />
           <Stat label="Aportado" value={formatMoney(totalContributed)} />
           <Stat label="Disponible por llamar" value={formatMoney(totalAvailable)} />

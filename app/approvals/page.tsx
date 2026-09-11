@@ -166,7 +166,7 @@ export default async function ApprovalsPage() {
                 </Link>
                 {row.subtitle && <div className="mt-0.5 text-sm text-ink-soft">{row.subtitle}</div>}
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <div className="text-right text-sm">
                   <div className={`font-medium tabular-nums ${row.amount < 0 ? "text-redline" : "text-ink"}`}>
                     {formatMoney(row.amount)}
@@ -196,7 +196,7 @@ function DecideForm({ row }: { row: ApprovalRow }) {
   }[row.entityType];
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <form action={config.action}>
         <input type="hidden" name={config.field} value={row.id} />
         <input type="hidden" name="decision" value="approved" />

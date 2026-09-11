@@ -176,13 +176,13 @@ export default async function BudgetLineDetailPage({
                     {formatMoney(amount)}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   {c.status === "pending" && c.requiredRole && (
                     <span className="text-xs text-ink-faint">Requiere: {c.requiredRole.replace(/_/g, " ")}</span>
                   )}
                   <StatusBadge status={c.status ?? "pending"} />
                   {c.status === "pending" && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <form action={decideBudgetChange}>
                         <input type="hidden" name="budgetChangeId" value={c.id} />
                         <input type="hidden" name="decision" value="approved" />
@@ -270,13 +270,13 @@ export default async function BudgetLineDetailPage({
             <li key={c.id}>
               <Link
                 href={`/contracts/${c.id}`}
-                className="flex items-center justify-between rounded-xl border border-line bg-surface p-5 shadow-sm transition-shadow hover:shadow-md"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-5 shadow-sm transition-shadow hover:shadow-md"
               >
                 <div>
                   <div className="font-medium text-ink">{c.counterpartyName}</div>
                   <div className="mt-0.5 text-sm text-ink-soft">{c.scope}</div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <div className="text-right text-sm">
                     <div className="font-medium tabular-nums text-ink">{formatMoney(c.current)}</div>
                     <div className="tabular-nums text-ink-faint">pagado {formatMoney(c.paid)}</div>
