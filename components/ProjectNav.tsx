@@ -39,12 +39,12 @@ export function ProjectNav({
 
   return (
     <div className="border-b border-line bg-surface">
-      <nav className="mx-auto flex max-w-6xl gap-1 px-6">
+      <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-6">
         {tabs.map((tab) => (
           <Link
             key={tab.key}
             href={tab.href}
-            className={`border-b-2 px-3 py-3 text-sm font-medium transition-colors ${
+            className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium transition-colors ${
               active === tab.key
                 ? "border-blueprint text-blueprint"
                 : "border-transparent text-ink-soft hover:text-ink"

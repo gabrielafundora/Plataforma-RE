@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+html,
+body {
+  /* Red de seguridad: si algo se desborda (una tabla ancha sin su
+     propio overflow-x-auto, una fila de acciones sin flex-wrap), que
+     se recorte en vez de correr la página entera de lado — eso es lo
+     que se sentía como "se mueve" en celular. Las tablas anchas siguen
+     scrolleando bien porque su overflow-x-auto vive en un div interno,
+     no depende de que el body permita overflow. */
+  overflow-x: hidden;
+}
+
 body {
   background: theme("colors.paper");
   color: theme("colors.ink");
