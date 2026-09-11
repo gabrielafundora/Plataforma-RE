@@ -4,9 +4,9 @@
 // structure (it's what you run to create/migrate the DB). This file is
 // a typed query layer on top of that — only the tables/views the slices
 // built so far (Costs + Cash Flow Engine, Revenue/For Sale, Capital,
-// Plan/Schedule, Business Plan + Monthly Close) actually touch are
-// mapped here. Extend it domain by domain as later slices (Platform
-// Core) get built.
+// Plan/Schedule, Business Plan + Monthly Close, Deal/Underwriting)
+// actually touch are mapped here. Extend it domain by domain as later
+// slices (Platform Core) get built.
 import {
   pgTable,
   pgView,
@@ -92,6 +92,8 @@ export const collectionStatus = pgEnum("collection_status", ["pending", "paid", 
 export const debtDrawStatus = pgEnum("debt_draw_status", ["requested", "submitted", "approved", "funded"]);
 
 // --- Monthly Close / Business Plan Snapshot (§3.3, §4.6) ---
+export const scenarioStatus = pgEnum("scenario_status", ["draft", "chosen", "archived"]);
+
 export const snapshotType = pgEnum("snapshot_type", ["baseline", "monthly_close"]);
 
 export const cashFlowCategory = pgEnum("cash_flow_category", [
@@ -448,14 +450,36 @@ export const distributions = pgTable("distributions", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Deal/Underwriting ligero (§3.3, §7.1 pantalla 3, decisión 8·01). Un
+// Project en status='deal' puede tener varios Scenarios (Base/Downside/
+// Upside/custom) mientras se evalúa — cada uno con su propio set de
+// scenario_assumptions (key/value genérico a propósito: los supuestos
+// de UW varían por asset class — ver lib/deal/scenarioModel.ts). Al
+// aprobar el Deal (lib/actions/deal.ts), el Scenario elegido pasa a
+// status='chosen', los demás a 'archived', y se congela como el primer
+// Snapshot (type='baseline').
+export const scenarios = pgTable("scenarios", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull(),
+  name: text("name").notNull(),
+  status: scenarioStatus("status").notNull().default("draft"),
+  createdBy: uuid("created_by").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const scenarioAssumptions = pgTable("scenario_assumptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  scenarioId: uuid("scenario_id").notNull(),
+  key: text("key").notNull(),
+  value: numeric("value", { precision: 18, scale: 6 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Monthly Close (§4.6, §7.1 pantalla 18) crea exactamente un snapshot
-// type='monthly_close' por corte. type='baseline' (congelado al aprobar
-// el Deal desde un Scenario elegido — §3.3) no tiene flujo de UW
-// construido todavía en esta app, así que sourceScenarioId siempre
-// queda null en la práctica — se mapea la columna porque la tabla
-// `scenarios` que referencia ya existe en schema.sql (scaffold
-// original), pero `scenarios`/`scenario_assumptions` en sí no se
-// mapean aquí: nada en la UI de esta vuelta los toca todavía.
+// type='monthly_close' por corte. type='baseline' se congela al
+// aprobar un Deal (lib/actions/deal.ts), con sourceScenarioId
+// apuntando al Scenario elegido.
 export const snapshots = pgTable("snapshots", {
   id: uuid("id").primaryKey().defaultRandom(),
   projectId: uuid("project_id").notNull(),

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { projects, snapshots, returnMetrics, users } from "@/lib/db/schema";
 import { formatMoney } from "@/lib/format";
@@ -7,10 +7,11 @@ import { AppHeader } from "@/components/AppHeader";
 import { ProjectNav } from "@/components/ProjectNav";
 
 // Historial de Snapshots (§3.3, §7.1 pantalla 17/18) — cada fila la
-// generó un Monthly Close, inmutable, no se editan aquí. Sin columna
-// "Baseline": esta app no tiene flujo de Deal/Underwriting que congele
-// un Scenario aprobado como primer snapshot (§3.3) — el historial es
-// puramente la secuencia de cierres mensuales, comparados entre sí.
+// generó un Monthly Close (mensual) o, la primera, aprobar el Deal
+// (Baseline — lib/actions/deal.ts:approveDeal). Ambas son inmutables,
+// no se editan aquí. La Baseline no tiene period_month (§3.3: "null
+// para 'baseline'"), así que se etiqueta distinto y el orden es por
+// fecha de creación, no por mes.
 export const dynamic = "force-dynamic";
 
 export default async function SnapshotsPage({ params }: { params: Promise<{ projectId: string }> }) {
@@ -29,14 +30,15 @@ export default async function SnapshotsPage({ params }: { params: Promise<{ proj
   const rows = await db
     .select({
       id: snapshots.id,
+      type: snapshots.type,
       periodMonth: snapshots.periodMonth,
       createdAt: snapshots.createdAt,
       createdByName: users.fullName,
     })
     .from(snapshots)
     .innerJoin(users, eq(users.id, snapshots.createdBy))
-    .where(and(eq(snapshots.projectId, projectId), eq(snapshots.type, "monthly_close")))
-    .orderBy(desc(snapshots.periodMonth));
+    .where(eq(snapshots.projectId, projectId))
+    .orderBy(desc(snapshots.createdAt));
 
   const metricsBySnapshot = new Map<string, { metricKey: string; scope: string; value: string }[]>();
   if (rows.length > 0) {
@@ -94,8 +96,14 @@ export default async function SnapshotsPage({ params }: { params: Promise<{ proj
                   return (
                     <tr key={r.id} className="border-t border-line hover:bg-surface-2/40">
                       <td className="px-4 py-2.5">
-                        <Link href={`/projects/${projectId}/snapshots/${r.id}`} className="font-medium text-blueprint hover:underline capitalize">
-                          {new Date(r.periodMonth + "T00:00:00").toLocaleDateString("es-MX", { month: "long", year: "numeric" })}
+                        <Link href={`/projects/${projectId}/snapshots/${r.id}`} className="font-medium text-blueprint hover:underline">
+                          {r.type === "baseline" ? (
+                            "Baseline"
+                          ) : (
+                            <span className="capitalize">
+                              {new Date(r.periodMonth + "T00:00:00").toLocaleDateString("es-MX", { month: "long", year: "numeric" })}
+                            </span>
+                          )}
                         </Link>
                       </td>
                       <td className="px-4 py-2.5 text-ink-soft">

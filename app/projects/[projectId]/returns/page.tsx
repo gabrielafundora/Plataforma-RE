@@ -1,25 +1,24 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { projects } from "@/lib/db/schema";
+import { projects, snapshots, returnMetrics } from "@/lib/db/schema";
 import { formatMoney } from "@/lib/format";
 import { AppHeader } from "@/components/AppHeader";
 import { ProjectNav } from "@/components/ProjectNav";
 import { computeMonthlyLedger } from "@/lib/businessplan/monthlyLedger";
-import { calculateIRR, calculateNPV, calculateMOIC } from "@/lib/businessplan/returns";
+import { calculateIRR, calculateNPV, calculateMOIC, DISCOUNT_RATE } from "@/lib/businessplan/returns";
 
 // Pantalla 17 — Returns / Business Plan (§7.1), recortada a lo que se
 // puede derivar en vivo. La spec completa compara Baseline vs. Actual
-// vs. Current Forecast por Snapshot — Monthly Close (pantalla 18) ya
-// genera esos Snapshots (ver /snapshots), pero esta pantalla sigue
-// mostrando solo el Current Forecast en vivo, sin comparación inline;
-// no hay columna "Baseline" real porque esta app no tiene flujo de
-// Deal/Underwriting que congele un Scenario aprobado (§3.3). Yield on
-// Cost / Development Spread quedan fuera: necesitan un pro forma de
-// operación estabilizada que este MVP no modela.
+// vs. Current Forecast por Snapshot — esta pantalla muestra el Current
+// Forecast en vivo, con la Baseline (congelada al aprobar el Deal —
+// lib/actions/deal.ts:approveDeal, §3.3) como referencia chica debajo
+// de cada métrica cuando existe. Un proyecto que arrancó directo
+// (seed.ts, antes de que existiera el modo Deal) no tiene Baseline —
+// esas métricas simplemente no muestran la referencia, no se inventa
+// una. Yield on Cost / Development Spread quedan fuera: necesitan un
+// pro forma de operación estabilizada que este MVP no modela.
 export const dynamic = "force-dynamic";
-
-const DISCOUNT_RATE = 0.15; // tasa de descuento anual fija — no hay selector en la spec (pantalla 17: solo "seleccionar Snapshot" y "export").
 
 export default async function ProjectReturnsPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
@@ -55,6 +54,18 @@ export default async function ProjectReturnsPage({ params }: { params: Promise<{
   // proyecto completo.
   const profitMargin = projectedRevenue > 0 ? (projectedRevenue - currentBudget) / projectedRevenue : null;
 
+  const [baseline] = await db
+    .select({ id: snapshots.id })
+    .from(snapshots)
+    .where(and(eq(snapshots.projectId, projectId), eq(snapshots.type, "baseline")));
+  const baselineMetrics = baseline
+    ? await db.select().from(returnMetrics).where(eq(returnMetrics.snapshotId, baseline.id))
+    : [];
+  const baselineValue = (scope: string, metricKey: string) => {
+    const m = baselineMetrics.find((r) => r.scope === scope && r.metricKey === metricKey);
+    return m ? Number(m.value) : null;
+  };
+
   return (
     <>
       <AppHeader crumb={<Link href="/" className="hover:text-blueprint">Mis Proyectos</Link>} />
@@ -71,15 +82,28 @@ export default async function ProjectReturnsPage({ params }: { params: Promise<{
         </p>
 
         <h2 className="mt-8 font-display text-lg font-semibold text-ink">Retornos</h2>
+        {baseline && (
+          <p className="mt-1 text-xs text-ink-faint">
+            "Baseline" = lo proyectado con el Scenario elegido al aprobar el Deal — inmutable.{" "}
+            <Link href={`/projects/${projectId}/snapshots/${baseline.id}`} className="text-blueprint hover:underline">
+              Ver Baseline completa →
+            </Link>
+          </p>
+        )}
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <ReturnStat label="IRR Unlevered" value={formatPercent(unleveredIrr)} />
-          <ReturnStat label="IRR Levered (equity)" value={formatPercent(leveredIrr)} />
-          <ReturnStat label={`NPV Unlevered @ ${(DISCOUNT_RATE * 100).toFixed(0)}%`} value={formatMoney(unleveredNpv)} />
-          <ReturnStat label="MOIC Proyecto" value={formatMultiple(unleveredMoic)} />
-          <ReturnStat label="MOIC Equity" value={formatMultiple(leveredMoic)} />
+          <ReturnStat label="IRR Unlevered" value={formatPercent(unleveredIrr)} baseline={baseline ? formatPercent(baselineValue("project", "irr_unlevered")) : undefined} />
+          <ReturnStat label="IRR Levered (equity)" value={formatPercent(leveredIrr)} baseline={baseline ? formatPercent(baselineValue("equity", "irr_levered")) : undefined} />
+          <ReturnStat
+            label={`NPV Unlevered @ ${(DISCOUNT_RATE * 100).toFixed(0)}%`}
+            value={formatMoney(unleveredNpv)}
+            baseline={baseline ? formatMoneyOrNA(baselineValue("project", "npv")) : undefined}
+          />
+          <ReturnStat label="MOIC Proyecto" value={formatMultiple(unleveredMoic)} baseline={baseline ? formatMultiple(baselineValue("project", "moic")) : undefined} />
+          <ReturnStat label="MOIC Equity" value={formatMultiple(leveredMoic)} baseline={baseline ? formatMultiple(baselineValue("equity", "moic")) : undefined} />
           <ReturnStat
             label={`Profit Margin (sobre ${formatMoney(projectedRevenue)} proyectado)`}
             value={profitMargin !== null ? `${(profitMargin * 100).toFixed(1)}%` : "N/A"}
+            baseline={baseline ? formatPercent(baselineValue("project", "profit_margin")) : undefined}
           />
         </div>
         {leveredIrr === null && (
@@ -131,8 +155,8 @@ export default async function ProjectReturnsPage({ params }: { params: Promise<{
 
         <p className="mt-8 max-w-2xl text-xs text-ink-faint">
           Fuera de esta vuelta (disclosed, no silencioso): Yield on Cost · Development Spread
-          (necesitan un pro forma de operación estabilizada no modelado en el MVP) · columna
-          "Baseline" en Snapshots (requiere un flujo de Deal/Underwriting que esta app no construyó).
+          (necesitan un pro forma de operación estabilizada no modelado en el MVP)
+          {!baseline && " · Baseline (este proyecto arrancó antes de que existiera el modo Deal/UW, o nunca pasó por él)"}.
         </p>
       </main>
     </>
@@ -149,11 +173,16 @@ function formatMultiple(value: number | null): string {
   return `${value.toFixed(2)}x`;
 }
 
-function ReturnStat({ label, value }: { label: string; value: string }) {
+function formatMoneyOrNA(value: number | null): string {
+  return value === null ? "N/A" : formatMoney(value);
+}
+
+function ReturnStat({ label, value, baseline }: { label: string; value: string; baseline?: string }) {
   return (
     <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
       <div className="text-xs text-ink-soft">{label}</div>
       <div className="mt-1 text-lg font-semibold tabular-nums text-ink">{value}</div>
+      {baseline !== undefined && <div className="mt-0.5 text-xs tabular-nums text-ink-faint">Baseline: {baseline}</div>}
     </div>
   );
 }

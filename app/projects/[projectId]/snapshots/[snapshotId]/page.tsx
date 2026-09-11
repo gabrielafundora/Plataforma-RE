@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { eq, and, ne, desc } from "drizzle-orm";
+import { eq, and, ne, lt, desc } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { projects, snapshots, cashFlowPeriods, cashFlowLines, returnMetrics, users } from "@/lib/db/schema";
 import { formatMoney } from "@/lib/format";
@@ -42,6 +42,7 @@ export default async function SnapshotDetailPage({
   const [snapshot] = await db
     .select({
       id: snapshots.id,
+      type: snapshots.type,
       periodMonth: snapshots.periodMonth,
       createdAt: snapshots.createdAt,
       createdByName: users.fullName,
@@ -112,20 +113,24 @@ export default async function SnapshotDetailPage({
 
   const metrics = await db.select().from(returnMetrics).where(eq(returnMetrics.snapshotId, snapshotId));
 
+  // "Anterior" es el snapshot más reciente creado ANTES que este,
+  // cualquiera sea su tipo — la cadena real es Baseline → Close 1 →
+  // Close 2 → ..., así que el primer Monthly Close se compara contra la
+  // Baseline, no contra "nada".
   const [prevSnapshot] = await db
-    .select({ id: snapshots.id, periodMonth: snapshots.periodMonth })
+    .select({ id: snapshots.id, type: snapshots.type, periodMonth: snapshots.periodMonth })
     .from(snapshots)
-    .where(and(eq(snapshots.projectId, projectId), eq(snapshots.type, "monthly_close"), ne(snapshots.id, snapshotId)))
-    .orderBy(desc(snapshots.periodMonth))
+    .where(and(eq(snapshots.projectId, projectId), ne(snapshots.id, snapshotId), lt(snapshots.createdAt, snapshot.createdAt)))
+    .orderBy(desc(snapshots.createdAt))
     .limit(1);
   const prevMetrics = prevSnapshot
     ? await db.select().from(returnMetrics).where(eq(returnMetrics.snapshotId, prevSnapshot.id))
     : [];
 
-  const periodLabel = new Date(snapshot.periodMonth + "T00:00:00").toLocaleDateString("es-MX", {
-    month: "long",
-    year: "numeric",
-  });
+  const periodLabel =
+    snapshot.type === "baseline"
+      ? "Baseline"
+      : new Date(snapshot.periodMonth + "T00:00:00").toLocaleDateString("es-MX", { month: "long", year: "numeric" });
 
   return (
     <>

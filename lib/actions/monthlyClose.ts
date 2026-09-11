@@ -8,7 +8,7 @@ import { db } from "@/lib/db/client";
 import { snapshots, cashFlowPeriods, cashFlowLines, returnMetrics } from "@/lib/db/schema";
 import { getDevUserId } from "@/lib/auth/devUser";
 import { computeMonthlyLedger } from "@/lib/businessplan/monthlyLedger";
-import { calculateIRR, calculateNPV, calculateMOIC } from "@/lib/businessplan/returns";
+import { calculateIRR, calculateNPV, calculateMOIC, DISCOUNT_RATE } from "@/lib/businessplan/returns";
 import { buildCashFlowPeriodRows, buildReturnMetricRows } from "@/lib/monthlyClose/buildSnapshotRows";
 
 // Monthly Close (§4.6, §7.1 pantalla 18) — el ritual mensual. Los pasos
@@ -17,9 +17,7 @@ import { buildCashFlowPeriodRows, buildReturnMetricRows } from "@/lib/monthlyClo
 // Forecast, Schedule, Inventory/Collections, Debt/Equity, Cash
 // Flow/Returns), que ya son capturas en vivo. Solo el paso 9 escribe
 // algo — congela el MonthlyLedger/returns de ese momento en un
-// Snapshot inmutable. Misma tasa de descuento fija (15%) que /returns,
-// porque no hay selector en la spec de esa pantalla.
-const DISCOUNT_RATE = 0.15;
+// Snapshot inmutable.
 
 /** El "mes en curso" a cerrar es siempre el mes calendario actual — sin
  * cola de meses atrasados por cerrar: esta app no versiona datos por

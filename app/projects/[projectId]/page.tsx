@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import {
@@ -34,6 +35,22 @@ export default async function ProjectDashboardPage({
   const { projectId } = await params;
 
   const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
+
+  if (!project) {
+    return (
+      <>
+        <AppHeader />
+        <main className="mx-auto max-w-6xl px-6 py-12 text-ink-soft">Proyecto no encontrado.</main>
+      </>
+    );
+  }
+
+  // Un Deal (§3.3) no tiene Budget/Schedule/Revenue/Capital real
+  // todavía — mostrar este Dashboard sería un montón de paneles vacíos
+  // y confusos. El workspace correcto mientras status='deal' es /deal.
+  if (project.status === "deal") {
+    redirect(`/projects/${projectId}/deal`);
+  }
 
   const rows = await db
     .select({
@@ -134,15 +151,6 @@ export default async function ProjectDashboardPage({
   const todayStr = new Date().toISOString().slice(0, 10);
   const totalMilestones = milestoneRows.length;
   const overdueMilestones = milestoneRows.filter((m) => m.targetDate < todayStr).length;
-
-  if (!project) {
-    return (
-      <>
-        <AppHeader />
-        <main className="mx-auto max-w-6xl px-6 py-12 text-ink-soft">Proyecto no encontrado.</main>
-      </>
-    );
-  }
 
   return (
     <>

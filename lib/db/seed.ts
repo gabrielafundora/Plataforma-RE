@@ -25,9 +25,12 @@ import {
   equityContributions,
   tasks,
   milestones,
+  scenarios,
+  scenarioAssumptions,
 } from "./schema";
 import { RESIDENTIAL_FOR_SALE_CATALOG, isLeaf } from "../costCodes/defaultCatalog";
 import { buildPaymentPlan, expandPaymentPlan } from "../revenue/paymentPlan";
+import { assumptionsToRows } from "../deal/scenarioModel";
 
 // Leaf amounts chosen so Soft Costs sums to 50M and Hard Costs to 300M —
 // the same totals the original single-line demo used — just spread
@@ -324,6 +327,61 @@ async function main() {
     { phaseId: phase.id, taskId: t4.id, name: "Entrega final", targetDate: "2026-11-30", isCritical: true },
   ]);
 
+  // Deal/Underwriting ligero (§3.3, decisión 8·01) — un segundo
+  // proyecto, todavía en status='deal', con 2 Scenarios comparables
+  // (Base apalancado, Upside sin deuda) para que /deal tenga algo real
+  // que mostrar desde el primer día, igual que Proyecto Polanco lo
+  // tiene para el resto de módulos.
+  const [dealProject] = await db
+    .insert(projects)
+    .values({
+      portfolioId: portfolio.id,
+      name: "Proyecto Reforma (Deal)",
+      status: "deal",
+      strategy: "development",
+      assetClass: "residential_for_sale",
+      currency: "MXN",
+      market: "MX",
+      location: "Ciudad de México",
+    })
+    .returning();
+
+  await db.insert(phases).values({
+    projectId: dealProject.id,
+    name: "Fase única",
+    assetClass: "residential_for_sale",
+  });
+
+  const [baseScenario] = await db
+    .insert(scenarios)
+    .values({ projectId: dealProject.id, name: "Base", status: "draft", createdBy: user.id })
+    .returning();
+  await db.insert(scenarioAssumptions).values(
+    assumptionsToRows({
+      pricePerM2: 60000,
+      totalAreaM2: 1800,
+      constructionCostPct: 0.6,
+      horizonMonths: 20,
+      leveraged: true,
+      ltc: 0.6,
+      interestRateBps: 1300,
+    }).map((r) => ({ scenarioId: baseScenario.id, key: r.key, value: String(r.value) }))
+  );
+
+  const [upsideScenario] = await db
+    .insert(scenarios)
+    .values({ projectId: dealProject.id, name: "Upside — sin deuda", status: "draft", createdBy: user.id })
+    .returning();
+  await db.insert(scenarioAssumptions).values(
+    assumptionsToRows({
+      pricePerM2: 68000,
+      totalAreaM2: 1800,
+      constructionCostPct: 0.55,
+      horizonMonths: 18,
+      leveraged: false,
+    }).map((r) => ({ scenarioId: upsideScenario.id, key: r.key, value: String(r.value) }))
+  );
+
   console.log("Seeded:", {
     organizationId: org.id,
     userId: user.id,
@@ -331,8 +389,10 @@ async function main() {
     phaseId: phase.id,
     contractId: contract.id,
     saleId: sale.id,
+    dealProjectId: dealProject.id,
   });
   console.log(`\nOpen: http://localhost:3000/projects/${project.id}/budget`);
+  console.log(`      http://localhost:3000/projects/${dealProject.id}/deal (Deal/UW, sin aprobar)`);
   console.log(`      http://localhost:3000/projects/${project.id}/schedule`);
   console.log(`      http://localhost:3000/projects/${project.id}/inventory`);
   console.log(`      http://localhost:3000/projects/${project.id}/collections`);

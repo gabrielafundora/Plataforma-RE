@@ -6,6 +6,14 @@
 // el periodo — ver lib/monthlyClose/buildSnapshotRows.ts) — ver
 // docs/strategy §3.3 y §4.6.
 
+// Tasa de descuento anual fija — no hay selector en la spec de Returns
+// (pantalla 17: solo "seleccionar Snapshot" y "export"). Un solo lugar
+// para las tres pantallas que la usan: /returns, Monthly Close
+// (lib/actions/monthlyClose.ts) y el motor de Deal/UW
+// (lib/deal/scenarioModel.ts) — antes vivía duplicada como constante
+// local en cada una.
+export const DISCOUNT_RATE = 0.15;
+
 function npvAtMonthlyRate(monthlyRate: number, cashFlows: number[]): number {
   return cashFlows.reduce((sum, cf, t) => sum + cf / Math.pow(1 + monthlyRate, t), 0);
 }

@@ -29,7 +29,7 @@ export default async function HomePage() {
             href="/projects/new"
             className="shrink-0 rounded-lg bg-blueprint px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
           >
-            + Nuevo Proyecto
+            + Nuevo Deal
           </Link>
         </div>
 
@@ -37,7 +37,7 @@ export default async function HomePage() {
           {rows.map((p) => (
             <li key={p.id}>
               <Link
-                href={`/projects/${p.id}`}
+                href={p.status === "deal" ? `/projects/${p.id}/deal` : `/projects/${p.id}`}
                 className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-5 shadow-sm transition-shadow hover:shadow-md"
               >
                 <div>
